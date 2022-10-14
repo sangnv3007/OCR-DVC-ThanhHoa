@@ -72,18 +72,18 @@ Now go to <a href="http://127.0.0.1:8000/docs" class="external-link" target="_bl
 
 * The interactive API documentation will be automatically updated, including the new body:
 
-![Step 1](https://github.com/sangnv3007/Extract-Citizen-Identification-Information/blob/main/step1.png)
+![Step 1](https://github.com/sangnv3007/Extract-Membership-Card-Vietnam/blob/main/step1.png)
 
 * Click on the button "Try it out", it allows you to upload file and directly interact with the API:
 
-![Step 2](https://github.com/sangnv3007/Extract-Citizen-Identification-Information/blob/main/step2.png)
+![Step 2](https://github.com/sangnv3007/Extract-Membership-Card-Vietnam/blob/main/step2.png)
 
 * Then click on the "Execute" button, the user interface will communicate with your API, get the results and show them on the screen:
 
 Image example
 
-![CCCD Test](https://github.com/sangnv3007/Extract-Citizen-Identification-Information/blob/main/CMND%20(480).jpeg)
+![Members Test](https://github.com/sangnv3007/Extract-Membership-Card-Vietnam/blob/main/1.jpg)
 
 Return results
 
-![Step 3](https://github.com/sangnv3007/Extract-Citizen-Identification-Information/blob/main/step3.png)
+![Step 3](https://github.com/sangnv3007/Extract-Membership-Card-Vietnam/blob/main/step3.png)
