@@ -1,4 +1,4 @@
-# Extract-Membership-Card-Vietnam
+# Extract Membership Card Vietnam
 ### Setup
 Download folder [model](https://drive.google.com/drive/folders/1HIlzrgnhpRiwrDUOpmEhAwn69nkgwMZM?usp=sharing), unzip and copy to project run directory:
 ```
