@@ -1,6 +1,6 @@
 # Extract-Membership-Card-Vietnam
 ### Setup
-Download folder [model](https://drive.google.com/drive/folders/1GWKAuTKz6FAElXqQlUO_kYnBowhWqpAC?usp=sharing), unzip and copy to project run directory:
+Download folder [model](https://drive.google.com/drive/folders/1HIlzrgnhpRiwrDUOpmEhAwn69nkgwMZM?usp=sharing), unzip and copy to project run directory:
 ```
 model
 └───transformerocr.pth
@@ -22,7 +22,11 @@ FastAPI stands on the shoulders of giants:
 * <a href="https://pydantic-docs.helpmanual.io/" class="external-link" target="_blank">Pydantic</a> for the data parts.
 
 ## Installation
+<div class="termy">
 
+```console
+$ pip install -r requirements.txt
+```
 <div class="termy">
 
 ```console
