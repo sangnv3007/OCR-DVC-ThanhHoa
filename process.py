@@ -20,6 +20,18 @@ def EndecodeImage(base64_img):
     with open('decoded_image.png', 'wb') as file_to_save:
         decoded_image_data = base64.decodebytes(base64_img_bytes)
         file_to_save.write(decoded_image_data)
+# Ham check dinh dang dau vao cua anh
+def check_type_image(path):
+    imgName = str(path)
+    imgName = imgName[imgName.rindex('.')+1:]
+    imgName = imgName.lower()
+    return imgName
+#Ham ve cac boxes len anh
+def draw_prediction(img, classes, confidence, x, y, x_plus_w, y_plus_h):
+    label = str(classes)
+    color = (0, 0, 255)
+    cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
+    cv2.putText(img, label, (x-5 , y-5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 1)
 # Ham get output_layer
 def get_output_layers(net):
     layer_names = net.getLayerNames()
@@ -66,8 +78,6 @@ def load_model(path_weights_yolo, path_clf_yolo, path_to_class):
     return net, classes
 # Ham getIndices
 def getIndices(image, net, classes):
-    #image = cv2.imread(path_to_image)
-    #net = load_model('model/rec/yolov4-custom_rec.weights','model/rec/yolov4-custom_rec.cfg')
     (Width, Height) = (image.shape[1], image.shape[0])
     boxes = []
     class_ids = []
@@ -109,91 +119,91 @@ def vietocr_load():
     detector = Predictor(config)
     return detector
 # Crop image tu cac boxes
-def ReturnInfoCard(path, saveimg):
-    image = cv2.imread(path)
-    indices, boxes, classes, class_ids, image = getIndices(image, net_det, classes_det)
-    # print(indices)
-    list_boxes = []
-    label = []
-    for i in indices:
-        i = i[0]
-        box = boxes[i]
-        # print(box,str(classes[class_ids[i]]))
-        x = box[0]
-        y = box[1]
-        w = box[2]
-        h = box[3]
-        list_boxes.append([x, y])
-        label.append(str(classes[class_ids[i]]))
-        # draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
-    # cv2_imshow(image)
-    label_boxes = dict(zip(label, list_boxes))
-    # print(label_boxes)
-    if (check_enough_labels(label_boxes, classes)):
-        source_points = np.float32([label_boxes['top_left'], label_boxes['bottom-left'],
-                                   label_boxes['bottom-right'], label_boxes['top_right']])
-        crop = perspective_transoform(image, source_points)
-        indices, boxes, classes, class_ids, image = getIndices(crop, net_rec, classes_rec)
-        dict_home, dict_isssed_by = {}, {}
-        home_text, issued_by_text = [], []
-        label_boxes = []
-        imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+def ReturnInfoCard(path):
+    typeimage = check_type_image(path) 
+    if(typeimage!='png' and typeimage!='jpeg' and typeimage!='jpg' and typeimage != 'bmp'):
+        obj = MessageInfo(1, 'Invalid image file! Please try again.')
+        return obj
+    else:
+        image = cv2.imread(path)
+        indices, boxes, classes, class_ids, image = getIndices(image, net_det, classes_det)
+        # print(indices)
+        list_boxes = []
+        label = []
         for i in indices:
             i = i[0]
             box = boxes[i]
+            # print(box,str(classes[class_ids[i]]))
             x = box[0]
             y = box[1]
             w = box[2]
             h = box[3]
-            label_boxes.append(str(classes[class_ids[i]]))
-            #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
-            imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
-            img = Image.fromarray(imageCrop)
-            s = detector.predict(img)
-            if (class_ids[i] == 0): id_card = s
-            if (class_ids[i] == 1): name_card = s
-            if (class_ids[i] == 2): dob_card = s
-            if (class_ids[i] == 3): dict_home.update({s: y})
-            if (class_ids[i] == 4): join_date_card = s
-            if (class_ids[i] == 5): off_date_card = s
-            if (class_ids[i] == 6): dict_isssed_by.update({s: y})
-            if (class_ids[i] == 7): issue_date_card = s
-            if (class_ids[i] == 8): imgCrop = imageCrop
+            list_boxes.append([x, y])
+            label.append(str(classes[class_ids[i]]))
+            # draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
+        # cv2_imshow(image)
+        label_boxes = dict(zip(label, list_boxes))
+        # print(label_boxes)
         if (check_enough_labels(label_boxes, classes)):
-            status_text = "successful"
-            message_text = "Thành công"
-            for i in sorted(dict_home.items(),
-                            key=lambda item: item[1]): home_text.append(i[0])
-            for i in sorted(dict_isssed_by.items(
-            ), key=lambda item: item[1]): issued_by_text.append(i[0])
-            home_text = " ".join(home_text)
-            issued_by_text = " ".join(issued_by_text)
-            imgname = re.sub("[^0-9]", "", id_card)
-            #convert image to base64
-            if (saveimg):
-                pathSave = os.getcwd() + '\\anhthe'
+            source_points = np.float32([label_boxes['top_left'], label_boxes['bottom-left'],
+                                    label_boxes['bottom-right'], label_boxes['top_right']])
+            crop = perspective_transoform(image, source_points)
+            indices, boxes, classes, class_ids, image = getIndices(crop, net_rec, classes_rec)
+            dict_home, dict_isssed_by = {}, {}
+            home_text, issued_by_text = [], []
+            label_boxes = []
+            imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+            for i in indices:
+                i = i[0]
+                box = boxes[i]
+                x = box[0]
+                y = box[1]
+                w = box[2]
+                h = box[3]
+                label_boxes.append(str(classes[class_ids[i]]))
+                #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
+                imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
+                img = Image.fromarray(imageCrop)
+                s = detector.predict(img)
+                if (class_ids[i] == 0): id_card = s
+                if (class_ids[i] == 1): name_card = s
+                if (class_ids[i] == 2): dob_card = s
+                if (class_ids[i] == 3): dict_home.update({s: y})
+                if (class_ids[i] == 4): join_date_card = s
+                if (class_ids[i] == 5): off_date_card = s
+                if (class_ids[i] == 6): dict_isssed_by.update({s: y})
+                if (class_ids[i] == 7): issue_date_card = s
+                if (class_ids[i] == 8): imgCrop = imageCrop
+            if (check_enough_labels(label_boxes, classes)):
+                errorCode = 0
+                errorMessage = ""
+                for i in sorted(dict_home.items(),
+                                key=lambda item: item[1]): home_text.append(i[0])
+                for i in sorted(dict_isssed_by.items(
+                ), key=lambda item: item[1]): issued_by_text.append(i[0])
+                home_text = " ".join(home_text)
+                issued_by_text = " ".join(issued_by_text)
+                pathSave = os.getcwd() + '\\dangvien\\'
+                stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
                 if (os.path.exists(pathSave)):
-                    cv2.imwrite(pathSave + '\\anhthe' +
-                                imgname + ".jpg", imgCrop)
+                    cv2.imwrite(pathSave + stringImage, imgCrop)
                 else:
                     os.mkdir(pathSave)
-                    cv2.imwrite(pathSave + '\\anhthe' +
-                                imgname + ".jpg", imgCrop)
-            stringImage = "anhthe/anhthe"+ str(imgname) + ".jpg"
-            obj = ExtractCard(id_card, name_card, dob_card, home_text, join_date_card,
-                              off_date_card, issued_by_text, issue_date_card, stringImage, status_text, message_text)
-            return obj
+                    cv2.imwrite(pathSave + stringImage, imgCrop)
+                obj = ExtractCard(id_card, name_card, dob_card, home_text, join_date_card,
+                                off_date_card, issued_by_text, issue_date_card, stringImage, errorCode, errorMessage)
+                return obj
+            else:
+                obj = MessageInfo(3, "The photo quality is low. Please try the image again!")
+                return obj
         else:
-            obj = MessageInfo("failed", "Error! Try another image again !")
+            obj = MessageInfo(4, "Error! Membership Card not found !")
             return obj
-    else:
-        obj = MessageInfo("failed", "Error! Membership Card not found !")
-        return obj
 detector = vietocr_load()
 net_det, classes_det = load_model('./model/det/yolov4-tiny-custom_det.weights', './model/det/yolov4-tiny-custom_det.cfg', './model/det/obj.names')
 net_rec, classes_rec= load_model('./model/rec/yolov4-custom_rec.weights', './model/rec/yolov4-custom_rec.cfg', './model/rec/obj.names')
 class ExtractCard:
-    def __init__(self, id, name, dob, home, join_date, official_date, issued_by, issue_date, image, status, message):
+    def __init__(self, id, name, dob, home, join_date, official_date, issued_by, issue_date, image, errorCode, errorMessage):
         self.id = id
         self.name = name
         self.dob = dob
@@ -203,9 +213,9 @@ class ExtractCard:
         self.issued_by = issued_by
         self.issue_date = issue_date
         self.image = image
-        self.status = status
-        self.message = message
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
 class MessageInfo:
-    def __init__(self, status, message):
-        self.status = status
-        self.message = message
+    def __init__(self, errorCode, errorMessage):
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
