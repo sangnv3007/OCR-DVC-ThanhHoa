@@ -37,11 +37,11 @@ def upload(file: UploadFile = File(...)):
                 shutil.copyfileobj(file.file, buffer)
         obj = ReturnInfoCard(f'anhthe/{file.filename}')
         if(obj.errorCode==0):
-            return {"status": obj.errorCode,"message": obj.errorMessage, 
+            return {"errorCode": obj.errorCode,"errorMessage": obj.errorMessage, 
                     "data": [{"id": obj.id,"name": obj.name,"dob": obj.dob,"home": obj.home,"join_date":obj.join_date,
-                    "issued_by":obj.issued_by,"issue_date":obj.issue_date,"image":obj.image}]}
+                    "official_date": obj.official_date,"issued_by":obj.issued_by,"issue_date":obj.issue_date,"image":obj.image}]}
         else:
-            return {"status": obj.errorCode,"message": obj.errorMessage, "data": []}
+            return {"errorCode": obj.errorCode,"errorMessage": obj.errorMessage, "data": []}
     except Exception:
         return {"message": "There was an error uploading the file"}
     finally:

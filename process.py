@@ -7,6 +7,7 @@ import time
 import os
 import base64
 import re
+import glob
 ### Funtions
 # Ham decode, endecode
 def EncodeImage(pathImageEncode):
@@ -31,7 +32,7 @@ def draw_prediction(img, classes, confidence, x, y, x_plus_w, y_plus_h):
     label = str(classes)
     color = (0, 0, 255)
     cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
-    cv2.putText(img, label, (x-5 , y-5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 1)
+    cv2.putText(img, label, (x-5 , y-5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 # Ham get output_layer
 def get_output_layers(net):
     layer_names = net.getLayerNames()
@@ -66,8 +67,8 @@ def check_enough_labels(labels, classes):
     for i in classes:
         bool = i in labels
         if bool == False:
-            return (False)
-    return (True)
+            return False
+    return True
 # Ham load model yolo
 def load_model(path_weights_yolo, path_clf_yolo, path_to_class):
     weights_yolo = path_weights_yolo
@@ -108,7 +109,7 @@ def getIndices(image, net, classes):
                 boxes.append([x, y, w, h])
     indices = cv2.dnn.NMSBoxes(
         boxes, confidences, conf_threshold, nms_threshold)
-    return indices, boxes, classes, class_ids, image
+    return indices, boxes, classes, class_ids, image, confidences    
 # Ham load model vietOCr recognition
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
@@ -126,60 +127,61 @@ def ReturnInfoCard(path):
         return obj
     else:
         image = cv2.imread(path)
-        indices, boxes, classes, class_ids, image = getIndices(image, net_det, classes_det)
-        # print(indices)
-        list_boxes = []
-        label = []
-        for i in indices:
-            i = i[0]
-            box = boxes[i]
-            # print(box,str(classes[class_ids[i]]))
-            x = box[0]
-            y = box[1]
-            w = box[2]
-            h = box[3]
-            list_boxes.append([x, y])
-            label.append(str(classes[class_ids[i]]))
-            # draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
-        # cv2_imshow(image)
-        label_boxes = dict(zip(label, list_boxes))
-        # print(label_boxes)
-        if (check_enough_labels(label_boxes, classes)):
-            source_points = np.float32([label_boxes['top_left'], label_boxes['bottom-left'],
-                                    label_boxes['bottom-right'], label_boxes['top_right']])
-            crop = perspective_transoform(image, source_points)
-            indices, boxes, classes, class_ids, image = getIndices(crop, net_rec, classes_rec)
-            dict_home, dict_isssed_by = {}, {}
-            home_text, issued_by_text = [], []
-            label_boxes = []
-            imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+        if(image is not None):
+            indices, boxes, classes, class_ids, image, confidences  = getIndices(image, net_det, classes_det)
+            # print(indices)
+            list_boxes = []
+            label = []
             for i in indices:
                 i = i[0]
                 box = boxes[i]
+                # print(box,str(classes[class_ids[i]]))
                 x = box[0]
                 y = box[1]
                 w = box[2]
                 h = box[3]
-                label_boxes.append(str(classes[class_ids[i]]))
-                #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
-                imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
-                img = Image.fromarray(imageCrop)
-                s = detector.predict(img)
-                if (class_ids[i] == 0): id_card = s
-                if (class_ids[i] == 1): name_card = s
-                if (class_ids[i] == 2): dob_card = s
-                if (class_ids[i] == 3): dict_home.update({s: y})
-                if (class_ids[i] == 4): join_date_card = s
-                if (class_ids[i] == 5): off_date_card = s
-                if (class_ids[i] == 6): dict_isssed_by.update({s: y})
-                if (class_ids[i] == 7): issue_date_card = s
-                if (class_ids[i] == 8): imgCrop = imageCrop
+                list_boxes.append([x+ w/2, y + h/2])
+                label.append(str(classes[class_ids[i]]))
+                #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
+            #cv2.imshow('image', cv2.resize(image, (720,960), interpolation = cv2.INTER_CUBIC))
+            #cv2.waitKey()
+            label_boxes = dict(zip(label, list_boxes))
+            # print(label_boxes)
             if (check_enough_labels(label_boxes, classes)):
+                source_points = np.float32([label_boxes['top_left'], label_boxes['bottom_left'],
+                                        label_boxes['bottom_right'], label_boxes['top_right']])
+                crop = perspective_transoform(image, source_points)
+                indices, boxes, classes, class_ids, image, confidences = getIndices(crop, net_rec, classes_rec)
+                home_text, issued_by_text = [], []
+                label_boxes = []
+                imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+                dict_var = {'id':{}, 'name': {},'dob':{}, 'home':{},
+                            'join_date':{},'official_date':{}, 'issued_by':{}, 'issue_date':{}}
+                for i in indices:
+                    i = i[0]
+                    box = boxes[i]
+                    x = box[0]
+                    y = box[1]
+                    w = box[2]
+                    h = box[3]
+                    label_boxes.append(classes[class_ids[i]])
+                    #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
+                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
+                    s = detector.predict(Image.fromarray(imageCrop))
+                    if(class_ids[i] == 8):
+                        imgCrop = imageCrop
+                    else: dict_var[classes[class_ids[i]]].update({s:y})
+                #cv2.imshow('ảnh crop', crop)
+                #cv2.waitKey()
+                for i in classes:
+                    bool = i in label_boxes
+                    if(bool == False):
+                        dict_var[i].update({'N/A':0})
                 errorCode = 0
                 errorMessage = ""
-                for i in sorted(dict_home.items(),
+                for i in sorted(dict_var['home'].items(),
                                 key=lambda item: item[1]): home_text.append(i[0])
-                for i in sorted(dict_isssed_by.items(
+                for i in sorted(dict_var['issued_by'].items(
                 ), key=lambda item: item[1]): issued_by_text.append(i[0])
                 home_text = " ".join(home_text)
                 issued_by_text = " ".join(issued_by_text)
@@ -190,14 +192,15 @@ def ReturnInfoCard(path):
                 else:
                     os.mkdir(pathSave)
                     cv2.imwrite(pathSave + stringImage, imgCrop)
-                obj = ExtractCard(id_card, name_card, dob_card, home_text, join_date_card,
-                                off_date_card, issued_by_text, issue_date_card, stringImage, errorCode, errorMessage)
+                obj = ExtractCard(list(dict_var['id'].keys())[0], list(dict_var['name'].keys())[0], list(dict_var['dob'].keys())[0], home_text,
+                                    list(dict_var['join_date'].keys())[0], list(dict_var['official_date'].keys())[0], issued_by_text, 
+                                    list(dict_var['issue_date'].keys())[0], stringImage, errorCode, errorMessage)
                 return obj
             else:
-                obj = MessageInfo(3, "The photo quality is low. Please try the image again!")
+                obj = MessageInfo(4, "Error! Membership Card not found !")
                 return obj
         else:
-            obj = MessageInfo(4, "Error! Membership Card not found !")
+            obj = MessageInfo(2, "Input image not found! Check and try again.")
             return obj
 detector = vietocr_load()
 net_det, classes_det = load_model('./model/det/yolov4-tiny-custom_det.weights', './model/det/yolov4-tiny-custom_det.cfg', './model/det/obj.names')
@@ -219,3 +222,14 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
+# obj = ReturnInfoCard('D:\\Download Chorme\Members\\Download Internet\\5c5c50bdf0d1368f6fc0.jpeg')
+# print(obj.errorCode, obj.errorMessage)
+#Crop anh 
+# path = 'D:\Download Chorme\Members\Detect_edge\obj'
+# i=199
+# for filename in glob.glob(os.path.join(path, '*.jpg')):
+#     print(filename)
+#     imageCrop = ReturnInfoCard(filename)
+#     if(imageCrop is not None):
+#         cv2.imwrite('D:\Download Chorme\Members\Detect_text\CropMCVR\MembershipCrop'+str(i)+'.jpg', imageCrop)
+#         i = i + 1
