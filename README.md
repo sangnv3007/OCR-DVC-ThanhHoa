@@ -1,6 +1,6 @@
 # Extract Membership Card Vietnam
 ### Setup
-Download folder [model](https://drive.google.com/drive/folders/1HIlzrgnhpRiwrDUOpmEhAwn69nkgwMZM?usp=sharing), unzip and copy to project run directory:
+Download folder [model](https://drive.google.com/drive/folders/1C-q-SaCvLkeh5hYk2KA4ISg7-Sg9Uqny?usp=sharing), unzip and copy to project run directory:
 ```
 model
 └───transformerocr.pth
