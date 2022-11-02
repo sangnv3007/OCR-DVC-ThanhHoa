@@ -185,7 +185,7 @@ def ReturnInfoCard(path):
                 ), key=lambda item: item[1]): issued_by_text.append(i[0])
                 home_text = " ".join(home_text)
                 issued_by_text = " ".join(issued_by_text)
-                pathSave = os.getcwd() + '\\dangvien\\'
+                pathSave = os.getcwd() + '/dangvien/'
                 stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
                 if (os.path.exists(pathSave)):
                     cv2.imwrite(pathSave + stringImage, imgCrop)
