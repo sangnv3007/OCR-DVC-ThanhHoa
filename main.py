@@ -27,7 +27,7 @@ app.add_middleware(LimitUploadSize, max_upload_size=3000000)  # ~3MB
 @app.post("/MembershipCard/upload")
 def upload(file: UploadFile = File(...)):
     try:
-        pathSave = os.getcwd() + '\\anhthe'
+        pathSave = os.getcwd() + '/anhthe'
         if (os.path.exists(pathSave)):
             with open(f'anhthe/{file.filename}','wb') as buffer:
                 shutil.copyfileobj(file.file, buffer)

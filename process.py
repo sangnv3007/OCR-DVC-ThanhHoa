@@ -222,8 +222,8 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-# obj = ReturnInfoCard('D:\\Download Chorme\Members\\Download Internet\\5c5c50bdf0d1368f6fc0.jpeg')
-# print(obj.errorCode, obj.errorMessage)
+obj = ReturnInfoCard('D:\TD.API_ML\Extracter-Membership-Card\imgTest\Membership (377).jpeg')
+print(obj.errorCode, obj.errorMessage)
 #Crop anh 
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
 # i=199
