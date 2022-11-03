@@ -30,7 +30,7 @@ class LimitUploadSize(BaseHTTPMiddleware):
 
 
 app = FastAPI()
-app.add_middleware(LimitUploadSize, max_upload_size=4000000)  # ~3MB
+app.add_middleware(LimitUploadSize, max_upload_size=4000000)  # ~4MB
 
 @app.post("/MembershipCard/uploadBase64")
 def uploadBase64(item: Item):
