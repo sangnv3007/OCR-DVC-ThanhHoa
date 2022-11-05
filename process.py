@@ -21,6 +21,21 @@ def EndecodeImage(base64_img):
     with open('decoded_image.png', 'wb') as file_to_save:
         decoded_image_data = base64.decodebytes(base64_img_bytes)
         file_to_save.write(decoded_image_data)
+def resize_image(inputImg, width = 0, height = 0):
+    (new_w, new_h)  = (0,0)
+    (w, h) = (inputImg.shape[1], inputImg.shape[0])
+    if(width == 0 and height == 0):
+        return inputImg
+    if (width == 0):
+        r = height / float(h)
+        new_w = int(w * r)
+        new_h = height
+    else:
+        r = width / float(w)
+        new_w = width;
+        new_h = int(h * r)
+    imageResize = cv2.resize(inputImg, (new_w,new_h), interpolation = cv2.INTER_CUBIC)
+    return imageResize
 # Ham check dinh dang dau vao cua anh
 def check_type_image(path):
     imgName = str(path)
@@ -128,6 +143,9 @@ def ReturnInfoCard(path):
     else:
         image = cv2.imread(path)
         if(image is not None):
+            image = resize_image(image, height=1080)
+            cv2.imshow('image_input', image)
+            cv2.waitKey()
             indices, boxes, classes, class_ids, image, confidences  = getIndices(image, net_det, classes_det)
             # print(indices)
             list_boxes = []
@@ -142,9 +160,9 @@ def ReturnInfoCard(path):
                 h = box[3]
                 list_boxes.append([x+ w/2, y + h/2])
                 label.append(str(classes[class_ids[i]]))
-                #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
-            #cv2.imshow('image', cv2.resize(image, (720,960), interpolation = cv2.INTER_CUBIC))
-            #cv2.waitKey()
+                draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
+            cv2.imshow('image', resize_image(image, 720))
+            cv2.waitKey()
             label_boxes = dict(zip(label, list_boxes))
             # print(label_boxes)
             if (check_enough_labels(label_boxes, classes)):
@@ -222,8 +240,8 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-# obj = ReturnInfoCard('D:\TD.API_ML\Extracter-Membership-Card\imgTest\Membership (377).jpeg')
-# print(obj.errorCode, obj.errorMessage)
+#obj = ReturnInfoCard('D:\\Download Chorme\Members\\anhthe\\C5D433D4-68E3-4E00-85FC-6ECBCDA1C2C9.jpg')
+#print(obj.errorCode, obj.errorMessage)
 #Crop anh 
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
 # i=199
