@@ -32,7 +32,7 @@ def resize_image(inputImg, width = 0, height = 0):
         new_h = height
     else:
         r = width / float(w)
-        new_w = width;
+        new_w = width
         new_h = int(h * r)
     imageResize = cv2.resize(inputImg, (new_w,new_h), interpolation = cv2.INTER_CUBIC)
     return imageResize
@@ -51,7 +51,7 @@ def draw_prediction(img, classes, confidence, x, y, x_plus_w, y_plus_h):
 # Ham get output_layer
 def get_output_layers(net):
     layer_names = net.getLayerNames()
-    output_layers = [layer_names[i[0] - 1]
+    output_layers = [layer_names[i - 1]
                      for i in net.getUnconnectedOutLayers()]
     return output_layers
 # Transform sang toa do dich
@@ -144,14 +144,15 @@ def ReturnInfoCard(path):
         image = cv2.imread(path)
         if(image is not None):
             image = resize_image(image, height=1080)
-            cv2.imshow('image_input', image)
-            cv2.waitKey()
+            #print(image.shape[1], image.shape[0])
+            # cv2.imshow('image_input', image)
+            # cv2.waitKey()
             indices, boxes, classes, class_ids, image, confidences  = getIndices(image, net_det, classes_det)
             # print(indices)
             list_boxes = []
             label = []
             for i in indices:
-                i = i[0]
+                #i = i[0]
                 box = boxes[i]
                 # print(box,str(classes[class_ids[i]]))
                 x = box[0]
@@ -161,8 +162,8 @@ def ReturnInfoCard(path):
                 list_boxes.append([x+ w/2, y + h/2])
                 label.append(str(classes[class_ids[i]]))
                 draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h)) #Ve cac class len anh
-            cv2.imshow('image', resize_image(image, 720))
-            cv2.waitKey()
+            #cv2.imshow('image', image)
+            #cv2.waitKey()
             label_boxes = dict(zip(label, list_boxes))
             # print(label_boxes)
             if (check_enough_labels(label_boxes, classes)):
@@ -176,7 +177,7 @@ def ReturnInfoCard(path):
                 dict_var = {'id':{}, 'name': {},'dob':{}, 'home':{},
                             'join_date':{},'official_date':{}, 'issued_by':{}, 'issue_date':{}}
                 for i in indices:
-                    i = i[0]
+                    #i = i[0]
                     box = boxes[i]
                     x = box[0]
                     y = box[1]
@@ -189,7 +190,7 @@ def ReturnInfoCard(path):
                     if(class_ids[i] == 8):
                         imgCrop = imageCrop
                     else: dict_var[classes[class_ids[i]]].update({s:y})
-                #cv2.imshow('ảnh crop', crop)
+                #cv2.imshow('crop', crop)
                 #cv2.waitKey()
                 for i in classes:
                     bool = i in label_boxes
@@ -240,7 +241,7 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-#obj = ReturnInfoCard('D:\\Download Chorme\Members\\anhthe\\C5D433D4-68E3-4E00-85FC-6ECBCDA1C2C9.jpg')
+#obj = ReturnInfoCard('C:\\Users\\Sang TL\\Downloads\\Telegram Desktop\\photo_2022-11-05_14-59-29.jpg')
 #print(obj.errorCode, obj.errorMessage)
 #Crop anh 
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
