@@ -1,3 +1,4 @@
+from turtle import rt
 import cv2
 import numpy as np
 from PIL import Image
@@ -5,28 +6,42 @@ from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
 import time
 import os
-import base64
 import re
 import glob
 # Funtions
-# Ham decode, endecode
 
-
-def EncodeImage(pathImageEncode):
-    with open(pathImageEncode, 'rb') as binary_file:
-        binary_file_data = binary_file.read()
-        base64_encoded_data = base64.b64encode(binary_file_data)
-        base64_message = base64_encoded_data.decode('utf-8')
-        return base64_message
-
-
-def EndecodeImage(base64_img):
-    base64_img_bytes = base64_img.encode('utf-8')
-    with open('decoded_image.png', 'wb') as file_to_save:
-        decoded_image_data = base64.decodebytes(base64_img_bytes)
-        file_to_save.write(decoded_image_data)
-
-
+#Ham check miss_conner
+def find_miss_corner(labels, classes):
+    labels_miss = []
+    for i in classes:
+        bool = i in labels
+        if(bool == False):
+            labels_miss.append(i)
+    return labels_miss
+#Ham tinh toan miss_conner
+def calculate_missed_coord_corner(label_missed, coordinate_dict):
+    thresh = 0
+    if(label_missed[0]=='top_left'):
+        midpoint = np.add(coordinate_dict['top_right'], coordinate_dict['bottom_left']) / 2
+        y = 2 * midpoint[1] - coordinate_dict['bottom_right'][1] - thresh
+        x = 2 * midpoint[0] - coordinate_dict['bottom_right'][0] - thresh
+        coordinate_dict['top_left'] = (x, y)
+    elif(label_missed[0]=='top_right'):
+        midpoint = np.add(coordinate_dict['top_left'], coordinate_dict['bottom_right']) / 2
+        y = 2 * midpoint[1] - coordinate_dict['bottom_left'][1] - thresh
+        x = 2 * midpoint[0] - coordinate_dict['bottom_left'][0] - thresh
+        coordinate_dict['top_right'] = (x, y)
+    elif(label_missed[0]=='bottom_left'):
+        midpoint = np.add(coordinate_dict['top_left'], coordinate_dict['bottom_right']) / 2
+        y = 2 * midpoint[1] - coordinate_dict['top_right'][1] - thresh
+        x = 2 * midpoint[0] - coordinate_dict['top_right'][0] - thresh
+        coordinate_dict['bottom_left'] = (x, y)
+    elif(label_missed[0]=='bottom_right'):
+        midpoint = np.add(coordinate_dict['bottom_left'], coordinate_dict['top_right']) / 2
+        y = 2 * midpoint[1] - coordinate_dict['top_left'][1] - thresh
+        x = 2 * midpoint[0] - coordinate_dict['top_left'][0] - thresh
+        coordinate_dict['bottom_right'] = (x, y)
+    return coordinate_dict
 def resize_image(inputImg, width=0, height=0):
     (new_w, new_h) = (0, 0)
     (w, h) = (inputImg.shape[1], inputImg.shape[0])
@@ -57,8 +72,8 @@ def check_type_image(path):
 def draw_prediction(img, classes, confidence, x, y, x_plus_w, y_plus_h):
     label = str(classes)
     color = (0, 0, 255)
-    cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
-    cv2.putText(img, label, (x-5, y-5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+    cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 1)
+    cv2.putText(img, label, (x-5, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 # Ham get output_layer
 
 
@@ -148,7 +163,37 @@ def getIndices(image, net, classes):
     return indices, boxes, classes, class_ids, image, confidences
 # Ham load model vietOCr recognition
 
-
+def ReturnCrop(pathImage):
+    image = cv2.imread(pathImage)
+    image = resize_image(image, height=720)
+    indices, boxes, classes, class_ids, image, confidences = getIndices(
+        image, net_det, classes_det)
+    list_boxes = []
+    label = []
+    for i in indices:
+        #i = i[0]
+        box = boxes[i]
+        # print(box,str(classes[class_ids[i]]))
+        x = box[0]
+        y = box[1]
+        w = box[2]
+        h = box[3]
+        list_boxes.append([x+w/2, y+h/2])
+        label.append(str(classes[class_ids[i]]))
+    label_boxes = dict(zip(label, list_boxes))
+    label_miss = find_miss_corner(label_boxes, classes)
+    #Noi suy goc neu thieu 1 goc cua CCCD
+    if len(label_miss) == 1:
+        calculate_missed_coord_corner(label_miss, label_boxes)
+        source_points = np.float32([label_boxes['top_left'], label_boxes['bottom_left'],
+                                    label_boxes['bottom_right'], label_boxes['top_right']])
+        crop = perspective_transoform(image, source_points)
+        return crop
+    elif len(label_miss)==0:
+        source_points = np.float32([label_boxes['top_left'], label_boxes['bottom_left'],
+                                    label_boxes['bottom_right'], label_boxes['top_right']])
+        crop = perspective_transoform(image, source_points)
+        return crop
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
     config['weights'] = './model/transformerocr.pth'
@@ -163,93 +208,65 @@ def vietocr_load():
 def ReturnInfoCard(path):
     typeimage = check_type_image(path)
     if (typeimage != 'png' and typeimage != 'jpeg' and typeimage != 'jpg' and typeimage != 'bmp'):
-        obj = MessageInfo(1, 'Invalid image file! Please try again.')
+        obj = MessageInfo(1, 'Lỗi! Ảnh không đúng định dạng.')
         return obj
     else:
-        image = cv2.imread(path)
-        if (image is not None):
-            image = resize_image(image, height=720)
-            indices, boxes, classes, class_ids, image, confidences = getIndices(
-                image, net_det, classes_det)
-            # print(indices)
-            list_boxes = []
-            label = []
+        crop = ReturnCrop(path)
+        if(crop is not None):
+            indices, boxes, classes, class_ids, image, confidences = getIndices(crop, net_rec, classes_rec)
+            home_text, issued_by_text = [], []
+            label_boxes = []
+            imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+            dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
+                        'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}}
+
             for i in indices:
                 #i = i[0]
                 box = boxes[i]
-                # print(box,str(classes[class_ids[i]]))
                 x = box[0]
                 y = box[1]
                 w = box[2]
                 h = box[3]
-                list_boxes.append([x + w/2, y + h/2])
-                label.append(str(classes[class_ids[i]]))
-                draw_prediction(image, classes[class_ids[i]], confidences[i], round(
-                    x), round(y), round(x + w), round(y + h))  # Ve cac class len anh
-            cv2.imshow('image', resize_image(image, 720))
-            cv2.waitKey()
-            label_boxes = dict(zip(label, list_boxes))
-            # print(label_boxes)
-            if (check_enough_labels(label_boxes, classes)):
-                source_points = np.float32([label_boxes['top_left'], label_boxes['bottom_left'],
-                                            label_boxes['bottom_right'], label_boxes['top_right']])
-                crop = perspective_transoform(image, source_points)
-                indices, boxes, classes, class_ids, image, confidences = getIndices(
-                    crop, net_rec, classes_rec)
-                home_text, issued_by_text = [], []
-                label_boxes = []
-                imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
-                dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
-                            'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}}
-
-                for i in indices:
-                    #i = i[0]
-                    box = boxes[i]
-                    x = box[0]
-                    y = box[1]
-                    w = box[2]
-                    h = box[3]
-                    label_boxes.append(classes[class_ids[i]])
-                    draw_prediction(crop, classes[class_ids[i]], confidences[i], round(
-                        x), round(y), round(x + w), round(y + h))
-                    imageCrop = image[round(y): round(
-                        y + h), round(x):round(x + w)]
-                    s = detector.predict(Image.fromarray(imageCrop))
-                    if (class_ids[i] == 8):
-                        imgCrop = imageCrop
-                    else:
-                        dict_var[classes[class_ids[i]]].update({s: y})
-                #cv2.imshow('ảnh crop', crop)
-                # cv2.waitKey()
-                for i in classes:
-                    bool = i in label_boxes
-                    if (bool == False):
-                        dict_var[i].update({'N/A': 0})
-                errorCode = 0
-                errorMessage = ""
-                for i in sorted(dict_var['home'].items(),
-                                key=lambda item: item[1]): home_text.append(i[0])
-                for i in sorted(dict_var['issued_by'].items(
-                ), key=lambda item: item[1]): issued_by_text.append(i[0])
-                home_text = " ".join(home_text)
-                issued_by_text = " ".join(issued_by_text)
-                pathSave = os.getcwd() + '\\dangvien\\'
-                stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
-                if (os.path.exists(pathSave)):
-                    cv2.imwrite(pathSave + stringImage, imgCrop)
+                label_boxes.append(classes[class_ids[i]])
+                #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
+                imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
+                start = time.time()
+                s = detector.predict(Image.fromarray(imageCrop))
+                end = time.time()
+                total_time = end - start
+                print(str(total_time) + ' sec')
+                if (class_ids[i] == 8):
+                    imgCrop = imageCrop
                 else:
-                    os.mkdir(pathSave)
-                    cv2.imwrite(pathSave + stringImage, imgCrop)
-                obj = ExtractCard(list(dict_var['id'].keys())[0], list(dict_var['name'].keys())[0], list(dict_var['dob'].keys())[0], home_text,
-                                  list(dict_var['join_date'].keys())[0], list(
-                                      dict_var['official_date'].keys())[0], issued_by_text,
-                                  list(dict_var['issue_date'].keys())[0], stringImage, errorCode, errorMessage)
-                return obj
+                    dict_var[classes[class_ids[i]]].update({s: y})
+            #cv2.imshow('rec', crop)
+            #cv2.waitKey()
+            for i in classes:
+                bool = i in label_boxes
+                if (bool == False):
+                    dict_var[i].update({'N/A': 0})
+            errorCode = 0
+            errorMessage = ""
+            for i in sorted(dict_var['home'].items(),
+                            key=lambda item: item[1]): home_text.append(i[0])
+            for i in sorted(dict_var['issued_by'].items(
+            ), key=lambda item: item[1]): issued_by_text.append(i[0])
+            home_text = " ".join(home_text)
+            issued_by_text = " ".join(issued_by_text)
+            pathSave = os.getcwd() + '\\dangvien\\'
+            stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
+            if (os.path.exists(pathSave)):
+                cv2.imwrite(pathSave + stringImage, imgCrop)
             else:
-                obj = MessageInfo(4, "Error! Membership Card not found !")
-                return obj
+                os.mkdir(pathSave)
+                cv2.imwrite(pathSave + stringImage, imgCrop)
+            obj = ExtractCard(list(dict_var['id'].keys())[0], list(dict_var['name'].keys())[0], list(dict_var['dob'].keys())[0], home_text,
+                                list(dict_var['join_date'].keys())[0], list(
+                                    dict_var['official_date'].keys())[0], issued_by_text,
+                                list(dict_var['issue_date'].keys())[0], stringImage, errorCode, errorMessage)
+            return obj
         else:
-            obj = MessageInfo(2, "Input image not found! Check and try again.")
+            obj = MessageInfo(2, "Lỗi ! Không tìm ảnh thẻ đảng viên trong ảnh.")
             return obj
 
 
@@ -279,8 +296,8 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-#obj = ReturnInfoCard('D:\\Download Chorme\Members\\anhthe\\C5D433D4-68E3-4E00-85FC-6ECBCDA1C2C9.jpg')
-#print(obj.errorCode, obj.errorMessage)
+obj = ReturnInfoCard('D:\\Dowload Chorme\\Cloud\\test8.jpg')
+print(obj.errorCode, obj.errorMessage)
 # Crop anh
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
 # i=199
