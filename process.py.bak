@@ -165,7 +165,7 @@ def getIndices(image, net, classes):
 
 def ReturnCrop(pathImage):
     image = cv2.imread(pathImage)
-    #image = resize_image(image, height=960)
+    image = resize_image(image, height=960)
     indices, boxes, classes, class_ids, image, confidences = getIndices(
         image, net_det, classes_det)
     list_boxes = []
