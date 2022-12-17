@@ -165,7 +165,7 @@ def getIndices(image, net, classes):
 
 def ReturnCrop(pathImage):
     image = cv2.imread(pathImage)
-    image = resize_image(image, height=960)
+    #image = resize_image(image, height=960)
     indices, boxes, classes, class_ids, image, confidences = getIndices(
         image, net_det, classes_det)
     list_boxes = []
@@ -223,7 +223,7 @@ def ReturnInfoCard(path):
             imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
             dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
                         'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}, 'image': {}}
-            start = time.time()
+            #start = time.time()
             for i in indices:
                 #i = i[0]
                 box = boxes[i]
@@ -234,12 +234,16 @@ def ReturnInfoCard(path):
                 #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
                 if (class_ids[i] == 0 or class_ids[i] == 1 or class_ids[i] == 2 or class_ids[i] == 3):
                     label_boxes.append(classes[class_ids[i]])
-                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
+                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]    
+                    start = time.time()                    
                     s = detector.predict(Image.fromarray(imageCrop))
+                    end = time.time()
+                    total_time = end - start
+                    print(str(round(total_time, 2)) + ' [sec]')
                     dict_var[classes[class_ids[i]]].update({s: y})
-            end = time.time()
-            total_time = end - start
-            print(str(round(total_time, 2)) + ' sec')
+            #end = time.time()
+            #total_time = end - start
+            #print('Total: '+str(round(total_time, 2)) + ' sec')
             #cv2.imshow('rec', crop)
             # cv2.waitKey()
             for i in classes:
