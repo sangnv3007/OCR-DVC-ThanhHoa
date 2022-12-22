@@ -135,7 +135,7 @@ def getIndices(image, net, classes):
     class_ids = []
     confidences = []
     conf_threshold = 0.5
-    nms_threshold = 0.4
+    nms_threshold = 0.5
     scale = 0.00392
     # print(classes)
     # (416,416) img target size, swapRB=True,  # BGR -> RGB, center crop = False
@@ -165,7 +165,7 @@ def getIndices(image, net, classes):
 
 def ReturnCrop(pathImage):
     image = cv2.imread(pathImage)
-    image = resize_image(image, height=720)
+    #image = resize_image(image, height=960)
     indices, boxes, classes, class_ids, image, confidences = getIndices(
         image, net_det, classes_det)
     list_boxes = []
@@ -179,7 +179,10 @@ def ReturnCrop(pathImage):
         w = box[2]
         h = box[3]
         list_boxes.append([x+w/2, y+h/2])
+        #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
         label.append(str(classes[class_ids[i]]))
+    #cv2.imshow('rec', resize_image(image, height=720))
+    #cv2.waitKey()
     label_boxes = dict(zip(label, list_boxes))
     label_miss = find_miss_corner(label_boxes, classes)
     #Noi suy goc neu thieu 1 goc cua CCCD
@@ -196,9 +199,9 @@ def ReturnCrop(pathImage):
         return crop
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = './model/transformerocr.pth'
+    config['weights'] = './model/transformerocr_TD.pth'
     config['cnn']['pretrained'] = False
-    config['device'] = 'cpu'
+    config['device'] = 'cuda:0'
     config['predictor']['beamsearch'] = False
     detector = Predictor(config)
     return detector
@@ -213,34 +216,33 @@ def ReturnInfoCard(path):
     else:
         crop = ReturnCrop(path)
         if(crop is not None):
-            indices, boxes, classes, class_ids, image, confidences = getIndices(crop, net_rec, classes_rec)
+            indices, boxes, classes, class_ids, image, confidences = getIndices(
+                crop, net_rec, classes_rec)
             home_text, issued_by_text = [], []
             label_boxes = []
-            imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
+            #imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
             dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
-                        'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}}
-
+                        'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}, 'image': {}}
+            start = time.time()
             for i in indices:
                 #i = i[0]
                 box = boxes[i]
-                x = box[0]
-                y = box[1]
-                w = box[2]
-                h = box[3]
-                label_boxes.append(classes[class_ids[i]])
+                x, y, w, h = box[0], box[1], box[2], box[3]
                 #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
-                imageCrop = image[round(y): round(y + h), round(x):round(x + w)]
-                start = time.time()
-                s = detector.predict(Image.fromarray(imageCrop))
-                end = time.time()
-                total_time = end - start
-                print(str(total_time) + ' sec')
-                if (class_ids[i] == 8):
-                    imgCrop = imageCrop
-                else:
+                if (class_ids[i] == 0 or class_ids[i] == 1 or class_ids[i] == 2 or class_ids[i] == 3):
+                    label_boxes.append(classes[class_ids[i]])
+                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]          
+                    #start = time.time()             
+                    s = detector.predict(Image.fromarray(imageCrop))
+                    #end = time.time()
+                    #total_time = end - start
+                    #print(str(round(total_time, 2)) + ' [sec]')
                     dict_var[classes[class_ids[i]]].update({s: y})
+            end = time.time()
+            total_time = end - start
+            print('Total: '+str(round(total_time, 2)) + ' sec')
             #cv2.imshow('rec', crop)
-            #cv2.waitKey()
+            # cv2.waitKey()
             for i in classes:
                 bool = i in label_boxes
                 if (bool == False):
@@ -253,17 +255,18 @@ def ReturnInfoCard(path):
             ), key=lambda item: item[1]): issued_by_text.append(i[0])
             home_text = " ".join(home_text)
             issued_by_text = " ".join(issued_by_text)
-            pathSave = os.getcwd() + '\\dangvien\\'
-            stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
-            if (os.path.exists(pathSave)):
-                cv2.imwrite(pathSave + stringImage, imgCrop)
-            else:
-                os.mkdir(pathSave)
-                cv2.imwrite(pathSave + stringImage, imgCrop)
+            # pathSave = os.getcwd() + '\\dangvien\\'
+            # stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
+            # if (os.path.exists(pathSave)):
+            #     cv2.imwrite(pathSave + stringImage, imgCrop)
+            #     dict_var['image'].update({stringImage: 0})
+            # else:
+            #     os.mkdir(pathSave)
+            #     cv2.imwrite(pathSave + stringImage, imgCrop)
+            #     dict_var['image'].update({stringImage: 0})
             obj = ExtractCard(list(dict_var['id'].keys())[0], list(dict_var['name'].keys())[0], list(dict_var['dob'].keys())[0], home_text,
-                                list(dict_var['join_date'].keys())[0], list(
-                                    dict_var['official_date'].keys())[0], issued_by_text,
-                                list(dict_var['issue_date'].keys())[0], stringImage, errorCode, errorMessage)
+                              list(dict_var['join_date'].keys())[0], list(dict_var['official_date'].keys())[0], issued_by_text,
+                              list(dict_var['issue_date'].keys())[0], list(dict_var['image'].keys())[0], errorCode, errorMessage)
             return obj
         else:
             obj = MessageInfo(2, "Lỗi ! Không tìm ảnh thẻ đảng viên trong ảnh.")
@@ -296,8 +299,8 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-obj = ReturnInfoCard('D:\\Dowload Chorme\\Cloud\\test8.jpg')
-print(obj.errorCode, obj.errorMessage)
+obj = ReturnInfoCard('/home/polaris/ml/Extract-Membership-Card-Vietnam/anhthe/Membership (377).jpeg')
+if(obj.errorCode==0): print('Load model successful !')
 # Crop anh
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
 # i=199
