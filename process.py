@@ -199,9 +199,9 @@ def ReturnCrop(pathImage):
         return crop
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = './model/transformerocr.pth'
+    config['weights'] = './model/transformerocr_TD.pth'
     config['cnn']['pretrained'] = False
-    config['device'] = 'cpu'
+    config['device'] = 'cuda:0'
     config['predictor']['beamsearch'] = False
     detector = Predictor(config)
     return detector
@@ -214,11 +214,7 @@ def ReturnInfoCard(path):
         obj = MessageInfo(1, 'Lỗi! Ảnh không đúng định dạng.')
         return obj
     else:
-        start = time.time()
         crop = ReturnCrop(path)
-        end = time.time()
-        total_time = end - start
-        print('Time crop image: '+str(round(total_time, 2)) + ' [sec]')
         if(crop is not None):
             indices, boxes, classes, class_ids, image, confidences = getIndices(
                 crop, net_rec, classes_rec)
@@ -227,7 +223,7 @@ def ReturnInfoCard(path):
             #imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
             dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
                         'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}, 'image': {}}
-            #start = time.time()
+            start = time.time()
             for i in indices:
                 #i = i[0]
                 box = boxes[i]
@@ -235,17 +231,16 @@ def ReturnInfoCard(path):
                 #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
                 if (class_ids[i] == 0 or class_ids[i] == 1 or class_ids[i] == 2 or class_ids[i] == 3):
                     label_boxes.append(classes[class_ids[i]])
-                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]      
-                    img = Image.fromarray(imageCrop)     
-                    start = time.time()             
-                    s = detector.predict(img)
-                    end = time.time()
-                    total_time = end - start
-                    print(str(round(total_time, 2)) + ' [sec]')
+                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]          
+                    #start = time.time()             
+                    s = detector.predict(Image.fromarray(imageCrop))
+                    #end = time.time()
+                    #total_time = end - start
+                    #print(str(round(total_time, 2)) + ' [sec]')
                     dict_var[classes[class_ids[i]]].update({s: y})
-            #end = time.time()
-            #total_time = end - start
-            #print('Total: '+str(round(total_time, 2)) + ' sec')
+            end = time.time()
+            total_time = end - start
+            print('Total: '+str(round(total_time, 2)) + ' sec')
             #cv2.imshow('rec', crop)
             # cv2.waitKey()
             for i in classes:
@@ -304,7 +299,7 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-obj = ReturnInfoCard('C:\\Users\\anhvm\source\\repos\\Extract-Membership-Card-Vietnam\\anhthe\\000FDCB0-4BEA-458A-89EA-21A17A834C1A.jpg')
+obj = ReturnInfoCard('/home/polaris/ml/Extract-Membership-Card-Vietnam/anhthe/Membership (377).jpeg')
 if(obj.errorCode==0): print('Load model successful !')
 # Crop anh
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'

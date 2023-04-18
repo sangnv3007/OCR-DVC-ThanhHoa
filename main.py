@@ -39,16 +39,16 @@ def uploadBase64(item: Item):
     if(item.name is None): item.name= 'dangvien' +'_'+ str(time.time()) + '.jpg'
     image_as_bytes = str.encode(item.stringbase64)# convert string to bytes
     img_recovered = base64.b64decode(image_as_bytes)  # decode base64string
-    pathSave = os.getcwd() +'\\'+ 'anhthe'
+    pathSave = os.getcwd() +'/'+ 'anhthe'
     nameSave = title +'.jpg'
     if (os.path.exists(pathSave)):
-        with open(f'anhthe\\{nameSave}', "wb") as f:
+        with open(f'anhthe/{nameSave}', "wb") as f:
             f.write(img_recovered)
     else:
         os.mkdir(pathSave)
-        with open(f'anhthe\\{nameSave}', "wb") as f:
+        with open(f'anhthe/{nameSave}', "wb") as f:
             f.write(img_recovered)
-    obj = ReturnInfoCard(f'anhthe\\{nameSave}')
+    obj = ReturnInfoCard(f'anhthe/{nameSave}')
     if (obj.errorCode == 0):
         return {"errorCode": obj.errorCode, "errorMessage": obj.errorMessage,
                 "data": [{"id": obj.id, "name": obj.name, "dob": obj.dob, "home": obj.home, "join_date": obj.join_date,
@@ -60,24 +60,18 @@ def uploadBase64(item: Item):
     return {"message": f"Successfuly uploaded {item.name}"}
 @app.post("/MembershipCard/uploadFile")
 def uploadFile(file: UploadFile = File(...)):
-    try:
-        pathSave = os.getcwd() + '\\anhthe'
-        if (os.path.exists(pathSave)):
-            with open(f'anhthe\\{file.filename}', 'wb') as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        else:
-            os.mkdir(pathSave)
-            with open(f'anhthe\\{file.filename}', 'wb') as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        obj = ReturnInfoCard(f'anhthe\\{file.filename}')
-        if (obj.errorCode == 0):
-            return {"errorCode": obj.errorCode, "errorMessage": obj.errorMessage,
-                    "data": [{"id": obj.id, "name": obj.name, "dob": obj.dob, "home": obj.home, "join_date": obj.join_date,
-                              "official_date": obj.official_date, "issued_by": obj.issued_by, "issue_date": obj.issue_date, "image": obj.image}]}
-        else:
-            return {"errorCode": obj.errorCode, "errorMessage": obj.errorMessage, "data": []}
-    except Exception:
-        return {"message": "There was an error uploading the file"}
-    finally:
-        file.file.close()
-    return {"message": f"Successfuly uploaded {file.filename}"}
+    pathSave = os.getcwd() + '/anhthe'
+    if (os.path.exists(pathSave)):
+        with open(f'anhthe/{file.filename}', 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    else:
+        os.mkdir(pathSave)
+        with open(f'anhthe/{file.filename}', 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    obj = ReturnInfoCard(f'anhthe/{file.filename}')
+    if (obj.errorCode == 0):
+        return {"errorCode": obj.errorCode, "errorMessage": obj.errorMessage,
+                "data": [{"id": obj.id, "name": obj.name, "dob": obj.dob, "home": obj.home, "join_date": obj.join_date,
+                            "official_date": obj.official_date, "issued_by": obj.issued_by, "issue_date": obj.issue_date, "image": obj.image}]}
+    else:
+        return {"errorCode": obj.errorCode, "errorMessage": obj.errorMessage, "data": []}
