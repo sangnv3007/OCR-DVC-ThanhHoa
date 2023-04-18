@@ -136,7 +136,7 @@ def getIndices(image, net, classes):
     confidences = []
     conf_threshold = 0.5
     nms_threshold = 0.5
-    scale = 0.00392
+    scale = 1/255
     # print(classes)
     # (416,416) img target size, swapRB=True,  # BGR -> RGB, center crop = False
     blob = cv2.dnn.blobFromImage(
@@ -208,7 +208,7 @@ def vietocr_load():
 # Crop image tu cac boxes
 
 
-def ReturnInfoCard(path):
+async def ReturnInfoCard(path):
     typeimage = check_type_image(path)
     if (typeimage != 'png' and typeimage != 'jpeg' and typeimage != 'jpg' and typeimage != 'bmp'):
         obj = MessageInfo(1, 'Lỗi! Ảnh không đúng định dạng.')
@@ -229,14 +229,14 @@ def ReturnInfoCard(path):
                 box = boxes[i]
                 x, y, w, h = box[0], box[1], box[2], box[3]
                 #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
-                if (class_ids[i] == 0 or class_ids[i] == 1 or class_ids[i] == 2 or class_ids[i] == 3):
+                if (class_ids[i] != 6 and class_ids[i] != 7 and class_ids[i] != 8):
                     label_boxes.append(classes[class_ids[i]])
                     imageCrop = image[round(y): round(y + h), round(x):round(x + w)]          
-                    #start = time.time()             
+                    #start = time.time()       
                     s = detector.predict(Image.fromarray(imageCrop))
-                    #end = time.time()
-                    #total_time = end - start
-                    #print(str(round(total_time, 2)) + ' [sec]')
+                    # end = time.time()
+                    # total_time = end - start
+                    # print(str(round(total_time, 2)) + ' [sec]')
                     dict_var[classes[class_ids[i]]].update({s: y})
             end = time.time()
             total_time = end - start
@@ -299,8 +299,8 @@ class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-obj = ReturnInfoCard('/home/polaris/ml/Extract-Membership-Card-Vietnam/anhthe/Membership (377).jpeg')
-if(obj.errorCode==0): print('Load model successful !')
+# obj = ReturnInfoCard('/home/polaris/ml/Extract-Membership-Card-Vietnam/anhthe/Membership (377).jpeg')
+# if(obj.errorCode==0): print('Load model successful !')
 # Crop anh
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
 # i=199

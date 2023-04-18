@@ -30,6 +30,7 @@ model/
 anhthe/
 dangvien/
 imgTest/
+invalid-image/
 env/
 .venv/
 # Visual Studio 2015/2017 cache/options directory
