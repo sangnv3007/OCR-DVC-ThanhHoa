@@ -1,6 +1,8 @@
-opencv-python==4.6.0.66
+opencv-python
 Pillow==9.2.0
 vietocr==0.3.9
 torch==1.12.1
 torchvision==0.13.1
 python-multipart==0.0.5
+PyMuPDF
+PyYAML

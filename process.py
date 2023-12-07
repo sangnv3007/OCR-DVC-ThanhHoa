@@ -8,6 +8,9 @@ import time
 import os
 import re
 import glob
+import fitz
+import json
+from pathlib import Path
 # Funtions
 
 #Ham check miss_conner
@@ -58,25 +61,22 @@ def resize_image(inputImg, width=0, height=0):
     imageResize = cv2.resize(inputImg, (new_w, new_h),
                              interpolation=cv2.INTER_AREA)
     return imageResize
+
 # Ham check dinh dang dau vao cua anh
-
-
 def check_type_image(path):
     imgName = str(path)
     imgName = imgName[imgName.rindex('.')+1:]
     imgName = imgName.lower()
     return imgName
+
 # Ham ve cac boxes len anh
-
-
 def draw_prediction(img, classes, confidence, x, y, x_plus_w, y_plus_h):
     label = str(classes)
     color = (0, 0, 255)
     cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 1)
     cv2.putText(img, label, (x-5, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
 # Ham get output_layer
-
-
 def get_output_layers(net):
     layer_names = net.getLayerNames()
     output_layers = [layer_names[i - 1]
@@ -116,19 +116,24 @@ def check_enough_labels(labels, classes):
         if bool == False:
             return False
     return True
+
+# Ham khoi tao model
+def load_model_init(text_code):
+    global net, classes, object_labels
+    if (net is None):
+        net, classes, object_labels = load_model(f'./{text_code}/model/yolov4-custom.weights',
+                                  f'./{text_code}/model/yolov4-custom.cfg',
+                                  f'./{text_code}/model/obj.names')
+
 # Ham load model yolo
-
-
 def load_model(path_weights_yolo, path_clf_yolo, path_to_class):
     weights_yolo = path_weights_yolo
     clf_yolo = path_clf_yolo
     net = cv2.dnn.readNet(weights_yolo, clf_yolo)
-    with open(path_to_class, 'r') as f:
-        classes = [line.strip() for line in f.readlines()]
-    return net, classes
+    object_labels, classes = read_labels(path_to_class)
+    return net, classes, object_labels
+
 # Ham getIndices
-
-
 def getIndices(image, net, classes):
     (Width, Height) = (image.shape[1], image.shape[0])
     boxes = []
@@ -167,7 +172,7 @@ def ReturnCrop(pathImage):
     image = cv2.imread(pathImage)
     #image = resize_image(image, height=960)
     indices, boxes, classes, class_ids, image, confidences = getIndices(
-        image, net_det, classes_det)
+        image, net, classes)
     list_boxes = []
     label = []
     for i in indices:
@@ -197,109 +202,117 @@ def ReturnCrop(pathImage):
                                     label_boxes['bottom_right'], label_boxes['top_right']])
         crop = perspective_transoform(image, source_points)
         return crop
+    
+# Ham load thu vien vietOCR
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = './model/transformerocr_TD.pth'
+    config['weights'] = 'transformerocr.pth'
     config['cnn']['pretrained'] = False
-    config['device'] = 'cuda:0'
+    config['device'] = 'cpu'
     config['predictor']['beamsearch'] = False
     detector = Predictor(config)
     return detector
+
+# Ham chuyen dinh dang pdf sang dinh dang anh
+def pdf_to_image(pdf_path, code):
+    pdf_document = fitz.open(pdf_path)
+    file_name = os.path.basename(pdf_path)
+    image_url = []
+    code_path = os.path.join(os.getcwd(), code)
+    if (not os.path.exists(code_path)):
+        return image_url
+    for page_number in range(pdf_document.page_count):
+        page = pdf_document.load_page(page_number)
+        image = page.get_pixmap()
+        save_path = f'{code}/image/{file_name}_{page_number}.jpg'
+        image.save(save_path)
+        image_url.append(save_path)
+    return image_url
+
+# Init object label
+def read_labels(file_name):
+    classes = []
+    labels = ExtractedInformation()
+    with open(file_name, 'r') as file:
+        lines = file.readlines()
+        for line in lines:
+            label_name = line.strip()
+            classes.append(label_name)
+            setattr(labels, label_name, None)
+        #Init Messsage Information
+        setattr(labels, "errorCode", None)
+        setattr(labels, "errorMessage", None)
+    return labels, classes
+
 # Crop image tu cac boxes
-
-
-async def ReturnInfoCard(path):
+def ReturnInfoCard(path, text_code):
+    print(path)
     typeimage = check_type_image(path)
-    if (typeimage != 'png' and typeimage != 'jpeg' and typeimage != 'jpg' and typeimage != 'bmp'):
-        obj = MessageInfo(1, 'Lỗi! Ảnh không đúng định dạng.')
-        return obj
+    if (typeimage != 'pdf'):
+        rs = {
+            "errorCode": 1,
+            "errorMessage": "Lỗi! File không đúng định dạng.",
+            "results": []
+        }
+        return rs
     else:
-        crop = ReturnCrop(path)
-        if(crop is not None):
-            indices, boxes, classes, class_ids, image, confidences = getIndices(
-                crop, net_rec, classes_rec)
-            home_text, issued_by_text = [], []
-            label_boxes = []
-            #imgCrop = np.zeros((100, 100, 3), dtype=np.uint8)
-            dict_var = {'id': {}, 'name': {}, 'dob': {}, 'home': {},
-                        'join_date': {}, 'official_date': {}, 'issued_by': {}, 'issue_date': {}, 'image': {}}
-            start = time.time()
-            for i in indices:
-                #i = i[0]
-                box = boxes[i]
-                x, y, w, h = box[0], box[1], box[2], box[3]
-                #draw_prediction(crop, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
-                if (class_ids[i] != 6 and class_ids[i] != 7 and class_ids[i] != 8):
-                    label_boxes.append(classes[class_ids[i]])
-                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]          
-                    #start = time.time()       
+        image_url = pdf_to_image(path, text_code)
+        for url in image_url:    
+            file_name = Path(url).stem
+            image_data = cv2.imread(url)
+            indices, boxes, labels, class_ids, image, confidences = getIndices(
+            image_data, net, classes)
+            label_dict = {key: {} for key in classes}
+            if len(indices) > 0:
+                for i in indices:
+                    # i = i[0]
+                    box = boxes[i]
+                    x, y, w, h = box[0], box[1], box[2], box[3]
+                    #draw_prediction(image, classes[class_ids[i]], confidences[i], round(x), round(y), round(x + w), round(y + h))
+                    imageCrop = image[round(y): round(y + h), round(x):round(x + w)]    
+                    # #start = time.time()       
                     s = detector.predict(Image.fromarray(imageCrop))
-                    # end = time.time()
-                    # total_time = end - start
-                    # print(str(round(total_time, 2)) + ' [sec]')
-                    dict_var[classes[class_ids[i]]].update({s: y})
-            end = time.time()
-            total_time = end - start
-            print('Total: '+str(round(total_time, 2)) + ' sec')
-            #cv2.imshow('rec', crop)
-            # cv2.waitKey()
-            for i in classes:
-                bool = i in label_boxes
-                if (bool == False):
-                    dict_var[i].update({'N/A': 0})
-            errorCode = 0
-            errorMessage = ""
-            for i in sorted(dict_var['home'].items(),
-                            key=lambda item: item[1]): home_text.append(i[0])
-            for i in sorted(dict_var['issued_by'].items(
-            ), key=lambda item: item[1]): issued_by_text.append(i[0])
-            home_text = " ".join(home_text)
-            issued_by_text = " ".join(issued_by_text)
-            # pathSave = os.getcwd() + '\\dangvien\\'
-            # stringImage = "dangvien" + '_' + str(time.time()) + ".jpg"
-            # if (os.path.exists(pathSave)):
-            #     cv2.imwrite(pathSave + stringImage, imgCrop)
-            #     dict_var['image'].update({stringImage: 0})
-            # else:
-            #     os.mkdir(pathSave)
-            #     cv2.imwrite(pathSave + stringImage, imgCrop)
-            #     dict_var['image'].update({stringImage: 0})
-            obj = ExtractCard(list(dict_var['id'].keys())[0], list(dict_var['name'].keys())[0], list(dict_var['dob'].keys())[0], home_text,
-                              list(dict_var['join_date'].keys())[0], list(dict_var['official_date'].keys())[0], issued_by_text,
-                              list(dict_var['issue_date'].keys())[0], list(dict_var['image'].keys())[0], errorCode, errorMessage)
-            return obj
-        else:
-            obj = MessageInfo(2, "Lỗi ! Không tìm ảnh thẻ đảng viên trong ảnh.")
-            return obj
+                    #print(s)
+                    # # end = time.time()
+                    # # total_time = end - start
+                    # # print(str(round(total_time, 2)) + ' [sec]')
+                    label_dict[classes[class_ids[i]]].update({s: y})
+                # Gop cac thong tin vao tu dien 
+                for key, value in label_dict.items():
+                    if len(value) >=2: # Gop du lieu
+                        sorted_items = sorted(value.items(), key = lambda x:x[1])
+                        merged_value = ' '.join([k for k,v in sorted_items])
+                        label_dict[key] = merged_value
+                    elif not value: # Du lieu Null
+                        label_dict[key] = "NaN"
+                    else:
+                        label_dict[key] = list(value.keys())[0]
+                # for key,value in label_dict.items():
+                #     if hasattr(object_labels, key):  # Kiểm tra xem thuộc tính tồn tại trong đối tượng không
+                #         setattr(object_labels, key, value)  # Gán giá trị từ từ điển vào thuộc tính của đối tượng
+                # setattr(object_labels, "errorCode", 0)
+                # setattr(object_labels, "errorMessage", "")
+                rs = {
+                    "errorCode": 0,
+                    "errorMessage": "",
+                    "results": [label_dict]
+                }
+                return rs
 
-
+net = None
+classes = None
+object_labels = None
 detector = vietocr_load()
-net_det, classes_det = load_model('./model/det/yolov4-tiny-custom_det.weights',
-                                  './model/det/yolov4-tiny-custom_det.cfg', './model/det/obj.names')
-net_rec, classes_rec = load_model('./model/rec/yolov4-custom_rec.weights',
-                                  './model/rec/yolov4-custom_rec.cfg', './model/rec/obj.names')
 
-
-class ExtractCard:
-    def __init__(self, id, name, dob, home, join_date, official_date, issued_by, issue_date, image, errorCode, errorMessage):
-        self.id = id
-        self.name = name
-        self.dob = dob
-        self.home = home
-        self.join_date = join_date
-        self.official_date = official_date
-        self.issued_by = issued_by
-        self.issue_date = issue_date
-        self.image = image
-        self.errorCode = errorCode
-        self.errorMessage = errorMessage
-
+class ExtractedInformation:
+    def __init__(self):
+        pass
 
 class MessageInfo:
     def __init__(self, errorCode, errorMessage):
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-# obj = ReturnInfoCard('/home/polaris/ml/Extract-Membership-Card-Vietnam/anhthe/Membership (377).jpeg')
+
 # if(obj.errorCode==0): print('Load model successful !')
 # Crop anh
 # path = 'D:\Download Chorme\Members\Detect_edge\obj'
@@ -310,3 +323,8 @@ class MessageInfo:
 #     if(imageCrop is not None):
 #         cv2.imwrite('D:\Download Chorme\Members\Detect_text\CropMCVR\MembershipCrop'+str(i)+'.jpg', imageCrop)
 #         i = i + 1
+
+if __name__ == "__main__":
+    load_model_init('MVB1')
+    # load_model_init('MVB1')
+    obj = ReturnInfoCard('MVB1/CCTBDT (91).pdf', 'MVB1')
