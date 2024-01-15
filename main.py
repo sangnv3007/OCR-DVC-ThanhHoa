@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, status, Body
 from pydantic import BaseModel
 from typing import Union
-from process import ReturnInfoCard, load_model_init
+from process import ReturnInfo, load_model
 import json
 import uvicorn
 import os
@@ -37,21 +37,43 @@ class LimitUploadSize(BaseHTTPMiddleware):
 app = FastAPI()
 app.add_middleware(LimitUploadSize, max_upload_size=10000000)  # ~10MB
 
-# Load mo hinh 
-
-
+''' Load mo hinh '''
+# Chung chi tu bo, hoi phuc di tich
+net_MVB1, classes_MVB1 = load_model(f'./MVB1/model/yolov4-custom.weights',
+                                  f'./MVB1/model/yolov4-custom.cfg',
+                                  f'./MVB1/model/obj.names')
+# Giay chung nhan HDV du lich noi dia, HDV Quoc Te
+net_MVB2, classes_MVB2 = load_model(f'./MVB2/model/yolov4-custom.weights',
+                                  f'./MVB2/model/yolov4-custom.cfg',
+                                  f'./MVB2/model/obj.names')
+# Ly lich tu phap
+net_MVB3, classes_MVB3 = load_model(f'./MVB3/model/yolov4-custom.weights',
+                                  f'./MVB3/model/yolov4-custom.cfg',
+                                  f'./MVB3/model/obj.names')
 @app.post("/DVC/uploadFile")
-def uploadFile(code: Union[str, None] = None, file: UploadFile = File(...)):
-    pathSave = os.getcwd() + '/file'
-    if (os.path.exists(pathSave)):
-        with open(f'file/{file.filename}', 'wb') as buffer:
-            shutil.copyfileobj(file.file, buffer)
+async def uploadFile(textCode: Union[str, None] = None, file: UploadFile = File(...)):
+    formatted_code = textCode.upper()
+    model_name = f'net_{formatted_code}'
+    classes_name = f'classes_{formatted_code}'
+    if (model_name in globals()):
+        print(f'Mo hinh {model_name}')
+        pathSave = os.getcwd() + '/file'
+        if (os.path.exists(pathSave)):
+            with open(f'file/{file.filename}', 'wb') as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        else:
+            os.mkdir(pathSave)
+            with open(f'file/{file.filename}', 'wb') as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        
+        return await ReturnInfo(f'./file/{file.filename}', formatted_code, globals()[model_name], globals()[classes_name])
     else:
-        os.mkdir(pathSave)
-        with open(f'file/{file.filename}', 'wb') as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    load_model_init('MVB1')
-    return ReturnInfoCard(f'./file/{file.filename}', code)
+        rs = {
+            "errorCode": 2,
+            "errorMessage": "Lỗi! Mã văn bản không hợp lệ.",
+            "results": []
+        }
+        return rs
 
 # if __name__ == "__main__":
 #     uvicorn.run(app,host='192.168.2.167', port=8005)
