@@ -132,6 +132,12 @@ def vietocr_load():
     detector = Predictor(config)
     return detector
 
+# Ham load mo hinh Yolo
+def yolo_load():
+    # Load a model
+    model = YOLO('./weights/best.pt')  # pretrained YOLOv8n model
+    return model
+
 # Ham chuyen dinh dang pdf sang dinh dang anh
 def pdf_to_image(pdf_path, code):
     pdf_document = fitz.open(pdf_path)
@@ -259,7 +265,7 @@ def ReturnInfDataNER(path, text_code, net, classes):
                 rs += value + '\n'
         return rs
 
-# Crop image tu cac boxes
+# Hma tra ve thong tin anh
 async def ReturnInfo(path, text_code, net, classes):
     typeimage = check_type_image(path)
     if (typeimage != 'pdf'):
@@ -303,9 +309,33 @@ async def ReturnInfo(path, text_code, net, classes):
             "results": [label_dict]
         }
         return rs
+def ReturnInfoNew(path):
+    typeimage = check_type_image(path)
+    if (typeimage != 'pdf'):
+        rs = {
+            "errorCode": 1,
+            "errorMessage": "Lỗi! File không đúng định dạng.",
+            "results": []
+        }
+        return rs
+    else:
+        img = cv2.imread(path)
+        results = engine.predict(img)
+        class_names = results.names.values()
+        for result in results:                                      
+            boxes = result.boxes.cpu().numpy()                        # get boxes on cpu in numpy
+            for box in boxes: 
+                class_id = result.names[box.cls[0].item()]  
+                print(class_id)                                       # iterate boxes
+                r = box.xyxy[0].astype(int)                            # get corner points as int 
+                crop = img[r[1]:r[3], r[0]:r[2]]
+
+                # cv2.imshow('Cropped', crop)
+                # cv2.waitKey(0)
 
 detector = vietocr_load()
+engine = yolo_load()
 
-# if __name__ == "__main__":
-#     path = './MVB3/AnhGoc/Untitled.FR12 - 0001.pdf'
-#     get_data_model(path)
+if __name__ == "__main__":
+    path = './MVB3/image/1M84bQQJ8kO7oORL (1).pdf_0.jpg'
+    ReturnInfoNew(path)
