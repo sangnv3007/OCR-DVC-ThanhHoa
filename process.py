@@ -1,4 +1,3 @@
-from turtle import rt
 import cv2
 import numpy as np
 from PIL import Image
@@ -11,6 +10,7 @@ import glob
 import fitz
 import json
 from pathlib import Path
+from ultralytics import YOLO
 ''' Funtions '''
 
 # Ham resize image
@@ -125,7 +125,7 @@ def ReturnCrop(pathImage):
 # Ham load thu vien vietOCR
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = 'transformerocr.pth'
+    config['weights'] = './models/transformerocr.pth'
     config['cnn']['pretrained'] = False
     config['device'] = 'cuda:0'
     config['predictor']['beamsearch'] = False
@@ -133,9 +133,10 @@ def vietocr_load():
     return detector
 
 # Ham load mo hinh Yolo
-def yolo_load():
+def yolo_load(model_path):
     # Load a model
-    model = YOLO('./weights/best.pt')  # pretrained YOLOv8n model
+    model = YOLO(model_path)  # pretrained YOLOv8n model
+    print(f"Load model from file {model_path} susscessfully..")
     return model
 
 # Ham chuyen dinh dang pdf sang dinh dang anh
@@ -143,16 +144,19 @@ def pdf_to_image(pdf_path, code):
     pdf_document = fitz.open(pdf_path)
     file_name = os.path.basename(pdf_path)
     image_url = []
-    code_path = os.path.join(os.getcwd(), code)
-    if (not os.path.exists(code_path)):
-        return image_url
+    code_path = os.path.join(os.getcwd(),'pdf2img',code)
+    zoom_x = 2.0  # horizontal zoom
+    zoom_y = 2.0  # vertical zoom
+    mat = fitz.Matrix(zoom_x, zoom_y)  # zoom factor 2 in each dimension
+
     for page_number in range(pdf_document.page_count):
         page = pdf_document.load_page(page_number)
-        image = page.get_pixmap()
+        image = page.get_pixmap(matrix=mat)
         image_folder = os.path.join(code_path,'image')
-        if(not os.path.exists(image_folder)):
-            os.mkdir(image_folder)
-        save_path = f'{code}/image/{file_name}_{page_number}.jpg'
+        #print(image_folder)
+        os.makedirs(image_folder,exist_ok=True)
+        save_path = f'{image_folder}/{file_name}_{page_number}.jpg'
+        #print(save_path)
         image.save(save_path)
         image_url.append(save_path)
     return image_url
@@ -167,6 +171,7 @@ def load_model(path_weights_yolo, path_clf_yolo, path_to_class):
     print(f"Load model from file {path_weights_yolo} susscessfully..")
     return net, classes
 
+# Ham lay ket qua detect dua vao file *.txt
 def get_data_model(folder_name):
     # Ly lich tu phap
     net_MVB3, classes_MVB3 = load_model(f'./MVB3/model/yolov4-custom.weights',
@@ -309,33 +314,265 @@ async def ReturnInfo(path, text_code, net, classes):
             "results": [label_dict]
         }
         return rs
-def ReturnInfoNew(path):
+
+# Ham xu ly tra ve du liẹu dang dictionary
+def process_image(img, engine, label_dict):
+    # Thuc hien phat hien vung chua du lieu
+    confidence = 0.65 # TODO : Fix cung nguong phat hien doi tuong
+    start_time_yolo = time.time()
+    results = engine.predict(img,conf=confidence)
+    end_time_yolo = time.time()
+    print(f'elapsed_time yolo: {end_time_yolo-start_time_yolo}[sec]')
+    for result in results:
+        boxes = result.boxes.cpu().numpy()
+        start_time = time.time()
+        for box in boxes:
+            class_id = result.names[box.cls[0].item()]
+            r = box.xyxy[0].astype(int)
+            image_crop = img[r[1]:r[3], r[0]:r[2]]
+            y = (r[1] + r[3]) / 2.0
+            s = detector.predict(Image.fromarray(image_crop))
+            label_dict[class_id].update({s: y})
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print ("elapsed_time ocr:{0}".format(elapsed_time) + "[sec]")
+    return label_dict
+
+# Ham loai bo dau tieng viet
+def no_accent_vietnamese(s):
+    s = re.sub('[áàảãạăắằẳẵặâấầẩẫậ]', 'a', s)
+    s = re.sub('[ÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬ]', 'A', s)
+    s = re.sub('[éèẻẽẹêếềểễệ]', 'e', s)
+    s = re.sub('[ÉÈẺẼẸÊẾỀỂỄỆ]', 'E', s)
+    s = re.sub('[óòỏõọôốồổỗộơớờởỡợ]', 'o', s)
+    s = re.sub('[ÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢ]', 'O', s)
+    s = re.sub('[íìỉĩị]', 'i', s)
+    s = re.sub('[ÍÌỈĨỊ]', 'I', s)
+    s = re.sub('[úùủũụưứừửữự]', 'u', s)
+    s = re.sub('[ÚÙỦŨỤƯỨỪỬỮỰ]', 'U', s)
+    s = re.sub('[ýỳỷỹỵ]', 'y', s)
+    s = re.sub('[ÝỲỶỸỴ]', 'Y', s)
+    s = re.sub('đ', 'd', s)
+    s = re.sub('Đ', 'D', s)
+    return s
+
+# Ham chinh sua thong tin OCR tu chuoi patterns
+def adjust_ocr_data(ocr_data, patterns):
+    for pattern in patterns:
+        # Convert ocr_data, pattern to vietnamese without accents
+        text1 = no_accent_vietnamese(ocr_data)
+        text2 = no_accent_vietnamese(pattern)
+        if re.search(text1, text2, re.IGNORECASE | re.UNICODE):
+            return pattern
+    
+    return ocr_data
+
+# Ham tra ve thong tin tren mo hinh moi
+async def ReturnInfoNew(path, text_code, engine):
     typeimage = check_type_image(path)
-    if (typeimage != 'pdf'):
+    classes = list(engine.names.values())
+    label_dict = {key: {} for key in classes}
+
+    # Dau vao la anh co dinh dang(*.jpg,*.jpeg,*.png,...)
+    if (typeimage == 'jpg' or typeimage == 'png' or typeimage == 'jpeg'):
+        img = cv2.imread(path)
+        label_dict.update(process_image(img, engine, label_dict))                                    
+    
+    # Dau vao la file pdf dang(*.pdf)
+    elif(typeimage == 'pdf'):
+        image_url = pdf_to_image(path, text_code)
+        for url in image_url:
+            img = cv2.imread(url)
+            label_dict.update(process_image(img, engine, label_dict))
+    
+    # Dau vao khong dung dinh dang
+    else:
         rs = {
             "errorCode": 1,
             "errorMessage": "Lỗi! File không đúng định dạng.",
             "results": []
         }
         return rs
-    else:
-        img = cv2.imread(path)
-        results = engine.predict(img)
-        class_names = results.names.values()
-        for result in results:                                      
-            boxes = result.boxes.cpu().numpy()                        # get boxes on cpu in numpy
-            for box in boxes: 
-                class_id = result.names[box.cls[0].item()]  
-                print(class_id)                                       # iterate boxes
-                r = box.xyxy[0].astype(int)                            # get corner points as int 
-                crop = img[r[1]:r[3], r[0]:r[2]]
+    
+    # Gop cac thong tin vao tu dien
+    for key, value in label_dict.items():
+        if len(value) >=2: # Gop du lieu
+            sorted_items = sorted(value.items(), key = lambda x:x[1])
+            merged_value = ' '.join([k for k,v in sorted_items])
+            label_dict[key] = merged_value
+        elif not value: # Du lieu Null
+            label_dict[key] = None
+        else:
+            label_dict[key] = list(value.keys())[0]
+    
+    ''' Customize thong tin theo ma van ban '''
 
-                # cv2.imshow('Cropped', crop)
-                # cv2.waitKey(0)
+    # TODO Custom ThoiGianHieuLuc - Ma van ban 6(GCN Truong Dat Chuan Quoc Gia)
+    if (text_code == 'MVB6'):
+        key = 'ThoiHanHieuLuc'
+        if key in label_dict:
+            text = label_dict[key]
+            pattern1 = r"c[óo] th[oồờ]i h[aàạậâăặ]n(.*)"
+            pattern2 = r"l[àa](.*)"
+            combined_pattern = f"{pattern1}|{pattern2}"
+            if (text is not None):
+                match = re.search(combined_pattern, text, re.IGNORECASE | re.UNICODE)
+                if match:
+                    content = match.group(1) or match.group(2)
+                    label_dict[key] = content.strip()
+    
+    # TODO: Custom TenHoi - Ma van ban 7(Thanh Lap Hoi)
+    if (text_code == 'MVB7'):
+        key = 'TenHoi'
+        pattern = r"th[aà]nh l[aàạậâăặ]p(.*)"
+        text = label_dict['TrichYeu']
+        if (text is not None):
+            match = re.search(pattern, text, re.IGNORECASE | re.UNICODE)
+            if match:
+                content = match.group(1)
+                label_dict[key] = content.strip()
+    
+    # TODO: Custom ThoiHanCuaGiayPhep - Ma van ban 8(GPKTTS)
+    if (text_code == 'MVB8'):
+        key = 'ThoiHanCuaGiayPhep'
+        pattern = r"[dđ][eếê]n(.*)"
+        text = label_dict[key]
+        print(text)
+        if (text is not None):
+                match = re.search(pattern, text, re.IGNORECASE | re.UNICODE)
+                if match:
+                    content = match.group(1)
+                    label_dict[key] = content.strip()
 
+    # TODO: Custom ChucVu,CoQuanBanHanh,LoaiKetQua - Ma van ban 13(CPKDVT)
+    if (text_code == 'MVB13'):
+        # Chinh sua thong tin ChucVu, CoQuanBanHanh
+        key1 = 'ChucVu'
+        key2 = 'CoQuanBanHanh'
+        label_dict[key1] = 'TRƯỞNG PHÒNG QUẢN LÝ VẬN TẢI'
+        label_dict[key2] = 'SỞ GTVT '+ label_dict[key2]
+
+        # Chinh sua thong tin OCR LoaiKetQua tu chuoi patterns
+        key3 = 'LoaiKetQua'
+        patterns = [
+        "XE CHẠY TUYẾN CỐ ĐỊNH",
+        "XE TAXI",
+        "XE ĐẦU KÉO",
+        "XE HỢP ĐỒNG",
+        "XE TẢI",
+        "XE CÔNG-TEN-NƠ"
+        ]
+        label_dict[key3] = adjust_ocr_data(label_dict[key3], patterns)
+    
+    # TODO: Custom ChucVu,CoQuanBanHanh,LoaiKetQua - Ma van ban 15(GPXTL)
+    if (text_code == 'MVB14'):
+        key = 'LoaiKetQua'
+        label_dict[key] = 'GIẤY PHÉP XE TẬP LÁI'
+
+    # TODO: Custom LoaiKetQua - Ma van ban 15(GPXTL)
+    if (text_code == 'MVB15'):
+        key1 = 'ThoiGianCoHieuLuc'
+        pattern = r"[dđ][eếêé]n(.*)"
+        text = label_dict[key1]
+        # Custom CoQuanBanHanh
+        key2 = 'CoQuanBanHanh'
+        label_dict[key2] = 'CHI CỤC CHĂN NUÔI VÀ THÚ Y'
+        # Custom LoaiKetQua
+        if (text is not None):
+            match = re.search(pattern, text, re.IGNORECASE | re.UNICODE)
+            if match:
+                content = match.group(1)
+                label_dict[key1] = content.strip()
+
+    # TODO: Custom LoaiKetQua - Ma van ban 16(CPHXOTKDVT)
+    if (text_code == 'MVB16'):
+        key = 'LoaiXe'
+        patterns = [
+        "XE CHẠY TUYẾN CỐ ĐỊNH",
+        "XE TAXI",
+        "XE ĐẦU KÉO",
+        "XE HỢP ĐỒNG",
+        "XE TẢI",
+        "XE CÔNG-TEN-NƠ"
+        ]
+        if key in label_dict:
+            label_dict[key] = adjust_ocr_data(label_dict[key], patterns)
+
+    # TODO: Custom Hang Xe - Ma van ban 17(GPLXQT)
+    if (text_code == 'MVB17'):
+        key1 = 'Hang'
+        key2 = 'LoaiKetQua'
+        label_dict[key1] = None
+        label_dict[key2] = 'GIẤY PHÉP LÁI XE QUỐC TẾ'
+        
+    # TODO: Custom LoaiKetQua,NgayBanHanh,MoTa (CMGPLX)
+    if (text_code == 'MVB18'):
+        # Key customize
+        keys = ['LoaiKetQua', 'NgayBanHanh', 'MoTa', 'SoSeri']
+        # Hanlde OCR result
+        for key in keys:
+            if key in label_dict and label_dict[key] is not None:
+                # TODO: Custom LoaiKetQua
+                if key == "LoaiKetQua":
+                    label_dict[key] = 'GIẤY PHÉP LÁI XE' # Nhan co dinh cua thu tuc
+                # TODO: Custom NgayBanHanh
+                elif key == "NgayBanHanh":
+                    # Tim cac doan so lien tiep (ngay,thang,nam)
+                    pattern = re.compile(r"(\d+)")
+                    # Tim kiem cac doan so trong chuoi
+                    matches = pattern.findall(label_dict[key])
+                    if len(matches) >= 3:
+                        day, month, year = matches[0],matches[1], matches[2]
+                        label_dict[key] = f'{day}/{month}/{year}'
+                # TODO: Custom MoTa
+                elif key == "MoTa":
+                    # Mô tả text cac hạng xe trong GPLX
+                    dict_vehicle_of_class = {
+                    "den duoi 175cm3":"Xe môtô 2 bánh có dung tích xilanh từ 50 đến dưới 175cm3", #Hang A1
+                    "175cm3 tro lên":"Xe môtô 2 bánh có dung tích xilanh từ 175cm3 trở lên và xe hạng A1", #Hang A2
+                    "xich lo may":"Xe lam, môtô 3 bánh, xích lô máy", #Hang A3
+                    "tai den 1000 kg":"Máy kéo có trọng tải đến 1000kg",# Hang A4
+                    "khong chuyen nghiep":"Ôtô chở người đến 9 chỗ ngồi; ô tô tải, máy kéo kéo rơmooc có trọng tải dưới 3500 kg (không chuyên nghiệp)", #Hang B1
+                    "3500 kg va xe hang B1":"Ôtô chở người đến 9 chỗ ngồi; ô tô tải, máy kéo kéo rơmooc có trọng tải dưới 3500 kg và xe hạng B1", #Hang B2
+                    "3500 kg tro len":"Ôtô tải, máy kéo kéo rơmooc, có trọng tải từ 3500 kg trở lên và xe hạng B1, B2", #Hang C
+                    "10 den 30 cho ngoi":"Ôtô chở từ 10 đến 30 chỗ ngồi và xe hang B1, B2, C", #Hang D
+                    "tren 30 cho ngoi":"Ôtô chở người trên 30 chỗ ngồi và xe hạng B1, B2, C, D", #Hang E
+                    "O to hang C keo romooc":"Ô tô hàng C kéo rơmooc, đầu kéo kéo sơmi rơmooc và xe hạng B1, B2, C, FB2" #Hang FC
+                    }
+                    result = ''
+                    if label_dict[key] is not None:
+                        text_ocr = no_accent_vietnamese(label_dict[key])
+                        print(text_ocr)
+                        for k,v in dict_vehicle_of_class.items():
+                            if re.search(k, text_ocr, re.IGNORECASE | re.UNICODE):
+                                result += v
+                        if(result != ''): label_dict[key] = result
+                # Bo qua so seri OCR chua chinh xac
+                elif key == "SoSeri":
+                    label_dict['SoSeri'] = None     
+        
+    # Tra ve ket qua sau khi duyet qua tat ca cac anh
+    rs = {
+        "errorCode": 0,
+        "errorMessage": "",
+        "results": [label_dict]
+    }
+    return rs
+
+# Ham tra ve thong tin OCR voi dau vao la 1 anh
+def OCRFile(file_path):
+    if not os.path.exists(file_path):
+        return f'Duong dan file {file_path} khong hop le !'
+    im_gray = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    #thresh, im_bw = cv2.threshold(im_gray, 10, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    #cv2.imshow('image_bw', im_bw)
+    cv2.waitKey(0)
+    s = detector.predict(Image.fromarray(im_gray))
+    # print(s)
+    return f'OCR results: {s}'
 detector = vietocr_load()
-engine = yolo_load()
+# engine = yolo_load('./models/MVB1/best.pt')
 
 if __name__ == "__main__":
-    path = './MVB3/image/1M84bQQJ8kO7oORL (1).pdf_0.jpg'
-    ReturnInfoNew(path)
+    path = '/home/polaris/ml/DVC/OCR-DVC-ThanhHoa/ocr_files/Screenshot_2.png'
+    OCRFile(path)

@@ -39,11 +39,12 @@ crop_img/
 data_line.zip
 rec_gt_test.txt
 rec_gt_train.txt
-MVB1
-MVB2
-MVB3
-MVB4
-MVB5
+MVB*
+models/
+files/
+error_files/
+ocr_files/
+pdf2img/
 # Visual Studio 2015/2017 cache/options directory
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot

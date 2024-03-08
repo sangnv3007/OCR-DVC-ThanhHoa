@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, status, Body
 from pydantic import BaseModel
 from typing import Union
-from process import ReturnInfo, load_model
+from process import ReturnInfoNew, yolo_load, OCRFile
 import json
 import uvicorn
 import os
@@ -34,46 +34,133 @@ class LimitUploadSize(BaseHTTPMiddleware):
                 return Response(status_code=status.HTTP_431_REQUEST_HEADER_FIELDS_TOO_LARGE)
         return await call_next(request)
 
-app = FastAPI()
+app = FastAPI(
+    title="OCR-DVCThanhHoa",
+    description="""Copyright 2024 for TAN DAN ., JSC. All right reserved\n
+    MVB1 - Chung chi tu bo, hoi phuc di tich 
+    MVB2 - Giay chung nhan HDV du lich noi dia, HDV Quoc Te
+    MVB3 - Ly lich tu phap
+    MVB4 - Ban sao van bang THPT
+    MVB5 - Quyet dinh khen thuong
+    MVB6 - Quyet dinh cong nhan truong Chuan quoc gia
+    MVB7 - Thu tuc thanh lap hoi
+    MVB8 - Giay phep khai thac thuy san
+    MVB9 - Thu tuc cham dut kinh doanh
+    MVB10 - Thu tuc an toan thuc pham san xuat kinh doanh
+    MVB11 - Thu tuc an toan thuc pham cap Huyen
+    MVB12 - Thu tuc cai chinh ho tich
+    MVB13 - Thu tuc phu hieu xe oto kinh doanh van tai(LoaiCu)
+    MVB14 - Thu tu cap phep giay phep xe tap lai
+    MVB15 - Thu tuc giay buon ban thuoc thu y
+    MVB16 - Thu tuc cap phu hieu xe o to kinh doanh van tai(LoaiMoi)
+    MVB17 - Thu tuc giay phep lai xe quoc te
+    MVB18 - Thu tuc cap moi giay phep lai xe\n""",
+    version="beta-0.0.1"
+    )
 app.add_middleware(LimitUploadSize, max_upload_size=10000000)  # ~10MB
 
 ''' Load mo hinh '''
+
 # Chung chi tu bo, hoi phuc di tich
-net_MVB1, classes_MVB1 = load_model(f'./MVB1/model/yolov4-custom.weights',
-                                  f'./MVB1/model/yolov4-custom.cfg',
-                                  f'./MVB1/model/obj.names')
+net_MVB1 = yolo_load(f'./models/MVB1/best.pt')
+
 # Giay chung nhan HDV du lich noi dia, HDV Quoc Te
-net_MVB2, classes_MVB2 = load_model(f'./MVB2/model/yolov4-custom.weights',
-                                  f'./MVB2/model/yolov4-custom.cfg',
-                                  f'./MVB2/model/obj.names')
+net_MVB2 = yolo_load(f'./models/MVB2/best.pt')
+
 # Ly lich tu phap
-net_MVB3, classes_MVB3 = load_model(f'./MVB3/model/yolov4-custom.weights',
-                                  f'./MVB3/model/yolov4-custom.cfg',
-                                  f'./MVB3/model/obj.names')
+net_MVB3 = yolo_load(f'./models/MVB3/best_rename.pt')
+
+# Ban sao van bang THPT
+net_MVB4 = yolo_load(f'./models/MVB4/best.pt')
+
+# Quyet dinh khen thuong
+net_MVB5 = yolo_load(f'./models/MVB5/best.pt')
+
+# Quyet dinh cong nhan truong Chuan quoc gia(Can xem lai)
+net_MVB6 = yolo_load(f'./models/MVB6/best.pt')
+
+# Thu tuc thanh lap hoi
+net_MVB7 = yolo_load(f'./models/MVB7/best.pt')
+
+# Giay phep khai thac thuy san (Chua bo sung du lieu)
+net_MVB8 = yolo_load(f'./models/MVB8/best.pt')
+
+# Thu tuc cham dut kinh doanh (Chua bo sung du lieu)
+net_MVB9 = yolo_load(f'./models/MVB9/best.pt')
+
+# Thu tuc an toan thuc pham san xuat kinh doanh (Chua bo sung du lieu)
+net_MVB10 = yolo_load(f'./models/MVB10/best.pt')
+
+# Thu tuc an toan thuc pham cap Huyen (Chua bo sung du lieu)
+net_MVB11 = yolo_load(f'./models/MVB11/best.pt')
+
+# Thu tuc cai chinh ho tich (Chua bo sung du lieu)
+net_MVB12 = yolo_load(f'./models/MVB12/best.pt')
+
+# Thu tuc phu hieu xe oto kinh doanh van tai(LoaiCu)
+net_MVB13 = yolo_load(f'./models/MVB13/best.pt')
+
+# Thu tu cap phep giay phep xe tu lai
+net_MVB14 = yolo_load(f'./models/MVB14/best.pt')
+
+# Thu tuc giay nhan buon ban thuoc thu y
+net_MVB15 = yolo_load(f'./models/MVB15/best.pt')
+
+# Thu tuc cap phu hieu xe o to kinh doanh van tai(LoaiMoi)
+net_MVB16 = yolo_load(f'./models/MVB16/best.pt')
+
+# Thu tuc giay phep lai xe quoc te
+net_MVB17 = yolo_load(f'./models/MVB17/best.pt')
+
+# Thu tuc cap moi giay phep lai xe
+net_MVB18 = yolo_load(f'./models/MVB18/best.pt')
+
 @app.post("/DVC/uploadFile")
 async def uploadFile(textCode: Union[str, None] = None, file: UploadFile = File(...)):
-    formatted_code = textCode.upper()
-    model_name = f'net_{formatted_code}'
-    classes_name = f'classes_{formatted_code}'
-    if (model_name in globals()):
-        print(f'Mo hinh {model_name}')
-        pathSave = os.getcwd() + '/file'
-        if (os.path.exists(pathSave)):
-            with open(f'file/{file.filename}', 'wb') as buffer:
-                shutil.copyfileobj(file.file, buffer)
+    try:
+        formatted_code = textCode.upper()
+        model_name = f'net_{formatted_code}'
+        if (model_name in globals()):
+            print(f'Mo hinh {model_name}')
+            pathSave = os.getcwd() + '/files'
+            if (os.path.exists(pathSave)):
+                with open(f'files/{file.filename}', 'wb') as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+            else:
+                os.mkdir(pathSave)
+                with open(f'files/{file.filename}', 'wb') as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+            
+            return await ReturnInfoNew(f'./files/{file.filename}', formatted_code, globals()[model_name])
         else:
-            os.mkdir(pathSave)
-            with open(f'file/{file.filename}', 'wb') as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        
-        return await ReturnInfo(f'./file/{file.filename}', formatted_code, globals()[model_name], globals()[classes_name])
-    else:
+            rs = {
+                "errorCode": 2,
+                "errorMessage": "Lỗi! Mã văn bản không hợp lệ.",
+                "results": []
+            }
+            return rs
+    except Exception as e:
+        save_directory = os.getcwd() + '/error_files'
+        os.makedirs(save_directory,exist_ok=True)
+        with open(f'error_files/{file.filename}', 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
         rs = {
-            "errorCode": 2,
-            "errorMessage": "Lỗi! Mã văn bản không hợp lệ.",
-            "results": []
-        }
+                "errorCode": 3,
+                "errorMessage": str(e),
+                "results": []
+            }
         return rs
 
+@app.post("/OCR/test")
+def VietOCR(file: UploadFile = File(...)):
+    pathSave = os.getcwd() + '/ocr_files'
+    if (os.path.exists(pathSave)):
+        with open(f'ocr_files/{file.filename}', 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    else:
+        os.mkdir(pathSave)
+        with open(f'ocr_files/{file.filename}', 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    return OCRFile(f'./ocr_files/{file.filename}')
 # if __name__ == "__main__":
 #     uvicorn.run(app,host='192.168.2.167', port=8005)

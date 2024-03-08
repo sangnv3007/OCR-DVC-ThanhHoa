@@ -1,9 +1,9 @@
 # Ham load thu vien vietOCR
 def vietocr_load():
     config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = 'transformerocr.pth'
+    config['weights'] = './models/transformerocr.pth'
     config['cnn']['pretrained'] = False
-    config['device'] = 'cuda:0'
+    config['device'] = 'cpu'
     config['predictor']['beamsearch'] = False
     detector = Predictor(config)
     return detector
@@ -119,15 +119,15 @@ def sorted_boxes(dt_boxes):
 
 if __name__ == "__main__":
     detector = vietocr_load()
-    ocr = PaddleOCR(lang="en", use_gpu=True)
+    ocr = PaddleOCR(lang="en", use_gpu=False)
 
-    folder_path = f'./MVB1/image/'
-    ExportNERTrain(folder_path)
+    # folder_path = f'./MVB1/image/'
+    # ExportNERTrain(folder_path)
 
     #get_workbook(folder_path)
     # file_path = './MVB3/AnhGoc/Untitled.FR12 - 0047.pdf'
     # rs = ReturnInfoTest(file_path, 'MVB3', net_MVB3, classes_MVB3)
 
     # Export single file
-    # file = f'./MVB5/cdhdhkdoanhpdf (7).jpg'
-    # ExportPaddleSingleDet(file)
+    file = f'./pdf2img/files/Untitled.FR12 - 0001.jpg'
+    ExportPaddleSingleDet(file)
