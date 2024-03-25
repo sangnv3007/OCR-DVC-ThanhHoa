@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, status, Body
 from pydantic import BaseModel
 from typing import Union
 from process import ReturnInfoNew, yolo_load, OCRFile
+from fastapi.middleware.cors import CORSMiddleware
 import json
 import uvicorn
 import os
@@ -54,9 +55,35 @@ app = FastAPI(
     MVB15 - Thu tuc giay buon ban thuoc thu y
     MVB16 - Thu tuc cap phu hieu xe o to kinh doanh van tai(LoaiMoi)
     MVB17 - Thu tuc giay phep lai xe quoc te
-    MVB18 - Thu tuc cap moi giay phep lai xe\n""",
+    MVB18 - Thu tuc cap moi giay phep lai xe
+    MVB19 - Thu tuc dang ky chi nhanh cua hop tac xa
+    MVB20 - Thu tuc chung chi nang luc thau 
+    MVB21 - Thu tuc dang ky noi quy lao dong
+    MVB22 - Thu tuc xac nhan tinh trang hon nha
+    MVB23 - Thu tuc khai bao an toan lao dong
+    MVB24 - Thu tuc giay chung nhan cua hang du dieu kien ban le xang dau
+    MVB25 - Thu tuc ho so cong bo hop quy san pham, hang hoa VLXD
+    MVB26 - Thu tuc bao cao lao dong nguoi nuoc ngoai
+    MVB27 - Thu tuc cap giay phep lao dong nuoc ngoai
+    \n""",
     version="beta-0.0.1"
     )
+
+origins = [
+    "http://192.168.2.70:3011",
+    "http://dangkyvaora.hanhchinhcong.org",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(LimitUploadSize, max_upload_size=10000000)  # ~10MB
 
 ''' Load mo hinh '''
@@ -114,6 +141,33 @@ net_MVB17 = yolo_load(f'./models/MVB17/best.pt')
 
 # Thu tuc cap moi giay phep lai xe
 net_MVB18 = yolo_load(f'./models/MVB18/best.pt')
+
+# Thu tuc dang ky chi nhanh cua hop tac xa
+net_MVB19 = yolo_load(f'./models/MVB19/best.pt')
+
+# Thu tuc chung chi nang luc thau 
+net_MVB20 = yolo_load(f'./models/MVB20/best.pt')
+
+# Thu tuc dang ky noi quy lao dong
+net_MVB21 = yolo_load(f'./models/MVB21/best.pt')
+
+# Thu tuc xac nhan tinh trang hon nhan
+net_MVB22 = yolo_load(f'./models/MVB22/best.pt')
+
+# Thu tuc khai bao an toan lao dong
+net_MVB23 = yolo_load(f'./models/MVB23/best.pt')
+
+# Thu tuc giay chung nhan cua hang du dieu kien ban le xang dau
+net_MVB24 = yolo_load(f'./models/MVB24/best.pt')
+
+# Thu tuc ho so cong bo hop quy san pham, hang hoa VLXD
+net_MVB25 = yolo_load(f'./models/MVB25/best.pt')
+
+# Thu tuc bao cao lao dong nguoi nuoc ngoai
+net_MVB26 = yolo_load(f'./models/MVB26/best.pt')
+
+# Thu tuc cap giay phep lao dong nuoc ngoai
+net_MVB27 = yolo_load(f'./models/MVB27/best.pt')
 
 @app.post("/DVC/uploadFile")
 async def uploadFile(textCode: Union[str, None] = None, file: UploadFile = File(...)):

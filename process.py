@@ -85,8 +85,8 @@ async def getIndices(image, net, classes):
     indices = cv2.dnn.NMSBoxes(
         boxes, confidences, conf_threshold, nms_threshold)
     return indices, boxes, classes, class_ids, image, confidences
-# Ham load model vietOCr recognition
 
+# Ham load model vietOCr recognition
 def ReturnCrop(pathImage):
     image = cv2.imread(pathImage)
     #image = resize_image(image, height=960)
@@ -369,6 +369,9 @@ def adjust_ocr_data(ocr_data, patterns):
 
 # Ham tra ve thong tin tren mo hinh moi
 async def ReturnInfoNew(path, text_code, engine):
+    # Tinh thoi gian tai thoi diem bat dau
+    start_time = time.time()
+
     typeimage = check_type_image(path)
     classes = list(engine.names.values())
     label_dict = {key: {} for key in classes}
@@ -550,11 +553,105 @@ async def ReturnInfoNew(path, text_code, engine):
                 # Bo qua so seri OCR chua chinh xac
                 elif key == "SoSeri":
                     label_dict['SoSeri'] = None     
-        
+        key
+    
+    # TODO: Custom LoaiKetQua,CoQuanBanHanh,DangKyLanDau,DangKyThayDoi (HTX)
+    if (text_code == 'MVB19'):
+        # Key customize
+        keys = ['LoaiKetQua', 'CoQuanBanHanh', 'NgayDangKyLanDau', 'NgayThayDoiCuoiCung']
+        # Hanlde OCR result
+        for key in keys:
+            if key in label_dict:
+                # TODO: Custom LoaiKetQua
+                if key == "LoaiKetQua":
+                    label_dict[key] = 'GIẤY CHỨNG NHẬN' # Nhan co dinh cua thu tuc
+                # TODO: Custom CoQuanBanHanh
+                elif key == "CoQuanBanHanh":
+                    label_dict[key] = 'SỞ KẾ HOẠCH VÀ ĐẦU TƯ TỈNH THANH HOÁ' # Nhan co dinh cua thu tuc
+                # TODO: Custom NgayDangKyLanDau va NgayThayDoiCuoiCung
+                elif key == "NgayDangKyLanDau" or key == "NgayThayDoiCuoiCung" and label_dict[key] is not None:
+                    # Tim cac doan so lien tiep (ngay,thang,nam)
+                    pattern = re.compile(r"(\d+)")
+                    # Tim kiem cac doan so trong chuoi
+                    matches = pattern.findall(label_dict[key])
+                    expected_matches = len(matches)
+                    if expected_matches >= 3:
+                        if expected_matches == 3:
+                            day, month, year = matches[:3]
+                            label_dict[key] = f'{day}/{month}/{year}'
+                        elif expected_matches == 4:
+                            times, day, month, year = matches
+                            label_dict['SoLanThayDoi'] = int(times)
+                            label_dict[key] = f'{day}/{month}/{year}'
+    
+    # TODO: Customize LoaiGiayTo, NgayBanHanh
+    if (text_code == 'MVB20'):
+        # Key customize
+        keys = ['NgayBanHanh','LoaiGiayTo','CoQuanBanHanh']
+        # Hanlde OCR result
+        for key in keys:
+            if key in label_dict:
+                if key == "NgayBanHanh" and label_dict[key] is not None:
+                    # Tim cac doan so lien tiep (ngay,thang,nam)
+                    pattern = re.compile(r"(\d+)")
+                    # Tim kiem cac doan so trong chuoi
+                    matches = pattern.findall(label_dict[key])
+                    expected_matches = len(matches)
+                    if expected_matches >= 3:
+                        day, month, year = matches
+                        label_dict[key] = f'{day}/{month}/{year}'
+                elif key == "LoaiGiayTo":
+                    label_dict[key] = f'CHỨNG CHỈ'
+                elif key == "CoQuanBanHanh":
+                    label_dict[key] = f'SỞ XÂY DỰNG'
+
+    # TODO: Custom TenDoanhNghiep (DKNQLD)
+    if (text_code == 'MVB21'):
+        key = 'TenDoanhNghiep'
+        if label_dict[key] is not None and key in label_dict:
+            text_ocr = label_dict[key]
+            label_dict[key]= re.sub(r'[-;]', '',text_ocr).strip()
+    
+    # TODO: Custom NgayHetHan,ChucVu (XNTTHN)
+    if (text_code == 'MVB22'):
+        # Key customize
+        keys = ['NgayHetHan', 'ChucVu', 'LoaiGiayTo']
+        # Hanlde OCR result
+        for key in keys:
+            if key in label_dict and label_dict[key] is not None:
+                if key == "NgayHetHan":
+                    # Tim cac doan so lien tiep (ngay,thang,nam)
+                    pattern = re.compile(r"(\d+)")
+                    # Tim kiem cac doan so trong chuoi
+                    matches = pattern.findall(label_dict[key])
+                    expected_matches = len(matches)
+                    if expected_matches >= 1:
+                        expiration_date = matches[0]
+                        label_dict[key] = expiration_date + " tháng"
+                elif key == "ChucVu":
+                    patterns = [
+                    "PHÓ CHỦ TỊCH",
+                    "CHỦ TỊCH"]
+                    key_words = 'PHO'
+                    text_ocr = no_accent_vietnamese(label_dict[key])
+                    if(re.search(key_words, text_ocr, re.IGNORECASE | re.UNICODE)):
+                        label_dict[key] = patterns[0]
+                    else:
+                        label_dict[key] = patterns[1]
+                elif key == "LoaiGiayTo":
+                    label_dict[key] = f'GIẤY XÁC NHẬN TÌNH TRẠNG HÔN NHÂN'
+
+    # Tinh thoi gian tai thoi diem ket thuc thuat toan
+    end_time = time.time()
+    
+    # Tinh tong thoi gian chay
+    elapsed_time = end_time - start_time
+
     # Tra ve ket qua sau khi duyet qua tat ca cac anh
     rs = {
         "errorCode": 0,
         "errorMessage": "",
+        "executionTime": round(elapsed_time,2),
         "results": [label_dict]
     }
     return rs
