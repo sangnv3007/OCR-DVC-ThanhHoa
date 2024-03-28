@@ -118,16 +118,17 @@ def sorted_boxes(dt_boxes):
     return _boxes
 
 if __name__ == "__main__":
-    detector = vietocr_load()
-    ocr = PaddleOCR(lang="en", use_gpu=False)
+    #detector = vietocr_load()
+    #ocr = PaddleOCR(lang="en", use_gpu=False)
 
-    # folder_path = f'./MVB1/image/'
-    # ExportNERTrain(folder_path)
+    folder_path = f'/home/polaris/ml/DVC/OCR-DVC-ThanhHoa/pdf2img/MVB22/NER_data/'
+    #ExportNERTrain(folder_path)
 
-    #get_workbook(folder_path)
+    get_workbook(folder_path)
     # file_path = './MVB3/AnhGoc/Untitled.FR12 - 0047.pdf'
     # rs = ReturnInfoTest(file_path, 'MVB3', net_MVB3, classes_MVB3)
 
+    # Load model YOLOv8
     # Export single file
-    file = f'./pdf2img/files/Untitled.FR12 - 0001.jpg'
-    ExportPaddleSingleDet(file)
+    # file = f'./pdf2img/files/Untitled.FR12 - 0001.jpg'
+    # ExportPaddleSingleDet(file)

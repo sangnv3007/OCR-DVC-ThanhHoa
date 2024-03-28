@@ -31,7 +31,7 @@ def get_workbook(path_folder):
         sheet[f'C{row_index}'] = row_data['tag']
 
     # Lưu file Excel
-    file_path = 'data.xlsx'  # Đặt tên và đường dẫn cho file Excel
+    file_path = 'data_NER_TTHN.xlsx'  # Đặt tên và đường dẫn cho file Excel
     wb.save(file_path)
 
     print(f"File Excel đã được tạo: '{file_path}'")
